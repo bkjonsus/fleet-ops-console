@@ -64,7 +64,7 @@ function Shell() {
           </button>
         </div>
         <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
-          {profile?.full_name} \u00b7 {role.replace("_", " ")}
+          {profile?.full_name} · {role.replace("_", " ")}
         </p>
       </div>
 

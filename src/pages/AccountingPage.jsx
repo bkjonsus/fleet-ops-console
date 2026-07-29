@@ -152,7 +152,7 @@ function InvoicesPanel({ table, loads, canEdit }) {
             <Field label="Customer"><input style={inputStyle} value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} /></Field>
             <Field label="Linked Load">
               <select style={inputStyle} value={form.load_number} onChange={(e) => setForm({ ...form, load_number: e.target.value })}>
-                <option value="">\u2014 none \u2014</option>
+                <option value="">— none —</option>
                 {loads.map((l) => <option key={l.id} value={l.load_number}>{l.load_number}</option>)}
               </select>
             </Field>
@@ -232,7 +232,7 @@ function ExpensesPanel({ table, loads, canEdit }) {
             <Field label="Amount"><input style={inputStyle} type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
             <Field label="Linked Load (optional)">
               <select style={inputStyle} value={form.load_number} onChange={(e) => setForm({ ...form, load_number: e.target.value })}>
-                <option value="">\u2014 none \u2014</option>
+                <option value="">— none —</option>
                 {loads.map((l) => <option key={l.id} value={l.load_number}>{l.load_number}</option>)}
               </select>
             </Field>
@@ -415,7 +415,7 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
 
           <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
             <div className="text-xs font-mono" style={{ color: COLORS.muted }}>
-              Gross {money(gross)} \u2212 Deductions {money(totalDeductions)} = <span className="font-bold ml-1" style={{ color: net >= 0 ? COLORS.green : COLORS.red }}>{money(net)} net</span>
+              Gross {money(gross)} − Deductions {money(totalDeductions)} = <span className="font-bold ml-1" style={{ color: net >= 0 ? COLORS.green : COLORS.red }}>{money(net)} net</span>
             </div>
             <button onClick={save} className="px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Statement</button>
           </div>
@@ -429,7 +429,7 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
           <div key={s.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
             <div>
               <div className="text-sm font-bold" style={{ color: COLORS.text }}>{s.driver}</div>
-              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{formatDate(s.period_start)} \u2192 {formatDate(s.period_end)} \u00b7 Net {money(s.net)}</div>
+              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{formatDate(s.period_start)} → {formatDate(s.period_end)} · Net {money(s.net)}</div>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => setViewingStatementId(s.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ border: `1px solid ${COLORS.amber}`, color: COLORS.amber }}>
@@ -481,7 +481,7 @@ function StatementPrintView({ stmt, onClose }) {
               {stmt.deductions.map((d, idx) => (
                 <tr key={idx} style={{ borderBottom: "1px solid #ddd" }}>
                   <td className="py-1">{d.label}</td>
-                  <td className="py-1 text-right font-mono text-red-700">\u2212{money(d.amount)}</td>
+                  <td className="py-1 text-right font-mono text-red-700">−{money(d.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -489,7 +489,7 @@ function StatementPrintView({ stmt, onClose }) {
         )}
         <div className="flex flex-col items-end gap-1 mt-6 text-sm">
           <div>Gross Pay: <span className="font-mono">{money(stmt.gross)}</span></div>
-          <div>Total Deductions: <span className="font-mono">\u2212{money(stmt.total_deductions)}</span></div>
+          <div>Total Deductions: <span className="font-mono">−{money(stmt.total_deductions)}</span></div>
           <div className="text-lg font-black mt-1 pt-2" style={{ borderTop: "2px solid #111" }}>Net Pay: <span className="font-mono">{money(stmt.net)}</span></div>
         </div>
         {stmt.notes && <div className="mt-6 text-xs text-gray-600"><span className="font-bold uppercase block mb-1">Notes</span>{stmt.notes}</div>}

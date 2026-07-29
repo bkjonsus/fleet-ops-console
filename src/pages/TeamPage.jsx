@@ -78,7 +78,7 @@ export default function TeamPage() {
       {created && (
         <div className="mb-4 p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.green}` }}>
           <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.green }}>
-            Account created \u2014 share these with the staff member now (shown only once)
+            Account created — share these with the staff member now (shown only once)
           </div>
           <div className="text-sm font-mono" style={{ color: COLORS.text }}>Email: {created.email}</div>
           <div className="text-sm font-mono" style={{ color: COLORS.text }}>Password: {created.password}</div>
@@ -123,7 +123,7 @@ export default function TeamPage() {
             {busy ? "Creating\u2026" : "Create Account"}
           </button>
           <p className="text-xs mt-2" style={{ color: COLORS.muted }}>
-            You set the password here \u2014 no email confirmation step. Share the email + password with the
+            You set the password here — no email confirmation step. Share the email + password with the
             staff member directly (text, in person, etc.) after creating.
           </p>
         </Panel>

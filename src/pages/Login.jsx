@@ -47,7 +47,7 @@ export default function Login() {
         </button>
 
         <p className="text-xs mt-4" style={{ color: COLORS.muted }}>
-          No self-signup \u2014 ask your admin to create your account.
+          No self-signup — ask your admin to create your account.
         </p>
       </form>
     </div>

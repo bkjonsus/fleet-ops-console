@@ -162,8 +162,8 @@ function TrucksPanel({ canEdit }) {
           <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.muted }}>Rental Returns Due</div>
           {rentals.map((t) => (
             <div key={t.id} className="flex items-center justify-between text-xs mb-1">
-              <span style={{ color: COLORS.text }}>Unit {t.unit_number} \u2014 {t.rented_from || "rental"}</span>
-              <Pill color={returnColor(daysUntil(t.return_date))}>{formatDate(t.return_date)} \u00b7 {returnLabel(daysUntil(t.return_date))}</Pill>
+              <span style={{ color: COLORS.text }}>Unit {t.unit_number} — {t.rented_from || "rental"}</span>
+              <Pill color={returnColor(daysUntil(t.return_date))}>{formatDate(t.return_date)} · {returnLabel(daysUntil(t.return_date))}</Pill>
             </div>
           ))}
         </div>
@@ -208,7 +208,7 @@ function TrucksPanel({ canEdit }) {
               </div>
               <div className="text-xs mt-1" style={{ color: COLORS.text }}>
                 {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                {t.vin && <span style={{ color: COLORS.muted }}> \u00b7 VIN {t.vin}</span>}
+                {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
               </div>
               <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
                 {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}
@@ -254,8 +254,8 @@ function TrailersPanel({ canEdit }) {
           <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.muted }}>Rental Returns Due</div>
           {rentals.map((t) => (
             <div key={t.id} className="flex items-center justify-between text-xs mb-1">
-              <span style={{ color: COLORS.text }}>Trailer {t.trailer_number} \u2014 {t.rented_from || "rental"}</span>
-              <Pill color={returnColor(daysUntil(t.return_date))}>{formatDate(t.return_date)} \u00b7 {returnLabel(daysUntil(t.return_date))}</Pill>
+              <span style={{ color: COLORS.text }}>Trailer {t.trailer_number} — {t.rented_from || "rental"}</span>
+              <Pill color={returnColor(daysUntil(t.return_date))}>{formatDate(t.return_date)} · {returnLabel(daysUntil(t.return_date))}</Pill>
             </div>
           ))}
         </div>
@@ -306,7 +306,7 @@ function TrailersPanel({ canEdit }) {
               </div>
               <div className="text-xs mt-1" style={{ color: COLORS.text }}>
                 {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                {t.vin && <span style={{ color: COLORS.muted }}> \u00b7 VIN {t.vin}</span>}
+                {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
               </div>
               <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
                 {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}

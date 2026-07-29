@@ -52,12 +52,8 @@ export function formatTime(t) {
   return `${h}:${mStr} ${period}`;
 }
 
-export function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr + "T00:00:00");
-  const t = new Date(todayISO() + "T00:00:00");
-  return Math.round((d - t) / 86400000);
-  // Postgres date/numeric columns reject "" (empty string) — they need null instead.
+// Postgres date/numeric columns reject "" (empty string) — they need null instead.
+// Always run form data through this before inserting/updating.
 export function sanitizeForInsert(obj) {
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -66,6 +62,12 @@ export function sanitizeForInsert(obj) {
   return out;
 }
 
+export function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + "T00:00:00");
+  const t = new Date(todayISO() + "T00:00:00");
+  return Math.round((d - t) / 86400000);
+}
 export function returnColor(days) {
   if (days === null) return COLORS.muted;
   if (days < 0) return COLORS.red;

@@ -204,7 +204,7 @@ function ExpensesPanel({ table, loads, canEdit }) {
 
   async function save() {
     if (!form.amount) return;
-    const { error } = await insert(sanitizeForInsert({
+    const { error } = await insert(sanitizeForInsert(form));
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 
@@ -346,7 +346,7 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
       pay_lines: payLines.filter((p) => p.description || p.amount),
       deductions: deductions.filter((d) => d.label || d.amount),
       notes, gross, total_deductions: totalDeductions, net, created_date: todayISO(),
-    });
+    }));
     if (!error) reset();
   }
 

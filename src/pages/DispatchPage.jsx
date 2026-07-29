@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Plus, ChevronRight } from "lucide-react";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO, sanitizeForInsert} from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO, sanitizeForInsert } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed"];
 const statusColor = (s) => {

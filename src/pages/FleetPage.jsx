@@ -141,7 +141,7 @@ function TrucksPanel({ canEdit }) {
 
   async function save() {
     if (!form.unit_number) return;
-    const { error } = await insert(form);
+    const { error } = await insert(sanitizeForInsert(form))
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 

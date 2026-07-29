@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert } from "../ui";
 
 const CONTRACT_TYPES = ["Company - Per Mile", "Company - Percentage", "Owner Operator", "Lease Driver (Truck & Trailer)"];
 const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
@@ -47,7 +47,7 @@ function DriversPanel({ canEdit }) {
 
   async function save() {
     if (!form.name) return;
-    const { error } = await insert(form);
+    const { error } = await insert(sanitizeForInsert(form));
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 

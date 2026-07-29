@@ -57,7 +57,15 @@ export function daysUntil(dateStr) {
   const d = new Date(dateStr + "T00:00:00");
   const t = new Date(todayISO() + "T00:00:00");
   return Math.round((d - t) / 86400000);
+  // Postgres date/numeric columns reject "" (empty string) — they need null instead.
+export function sanitizeForInsert(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[k] = v === "" ? null : v;
+  }
+  return out;
 }
+
 export function returnColor(days) {
   if (days === null) return COLORS.muted;
   if (days < 0) return COLORS.red;

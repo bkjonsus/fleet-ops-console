@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Plus, Printer, ArrowLeft, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid, sanitizeForInsert } from "../ui";
 
 const INVOICE_STATUSES = ["Draft", "Sent", "Paid", "Overdue"];
 const EXPENSE_CATEGORIES = ["Fuel", "Maintenance", "Insurance", "Payroll", "Tolls/Permits", "Other"];
@@ -129,7 +129,7 @@ function InvoicesPanel({ table, loads, canEdit }) {
 
   async function save() {
     if (!form.invoice_number || !form.customer || !form.amount) return;
-    const { error } = await insert(form);
+    const { error } = await insert(sanitizeForInsert(form));
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 
@@ -204,7 +204,7 @@ function ExpensesPanel({ table, loads, canEdit }) {
 
   async function save() {
     if (!form.amount) return;
-    const { error } = await insert(form);
+    const { error } = await insert(sanitizeForInsert({
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 
@@ -341,7 +341,7 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
 
   async function save() {
     if (!driver || payLines.every((p) => !p.amount)) return;
-    const { error } = await insert({
+    const { error } = await insert(sanitizeForInsert({
       driver, period_start: periodStart, period_end: periodEnd,
       pay_lines: payLines.filter((p) => p.description || p.amount),
       deductions: deductions.filter((d) => d.label || d.amount),

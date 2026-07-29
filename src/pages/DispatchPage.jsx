@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Plus, ChevronRight } from "lucide-react";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO, sanitizeForInsert} from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed"];
 const statusColor = (s) => {
@@ -27,8 +27,7 @@ export default function DispatchPage({ canEdit }) {
 
   async function save() {
     if (!form.load_number || !form.driver) return;
-    const payload = { ...form, rate: form.rate || null, miles: form.miles || null };
-    const { error } = await insert(payload);
+    const { error } = await insert(sanitizeForInsert(form));
     if (!error) {
       setForm(blankLoad());
       setShowForm(false);

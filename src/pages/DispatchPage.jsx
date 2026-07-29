@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Plus, ChevronRight } from "lucide-react";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO, sanitizeForInsert } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime, todayISO, sanitizeForInsert, TONU_STATUSES, tonuStatusColor } from "../ui";
 
-const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed"];
+const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled - TONU"];
 const statusColor = (s) => {
   if (s === "Delivered") return COLORS.green;
-  if (s === "Delayed") return COLORS.red;
+  if (s === "Delayed" || s === "Canceled - TONU") return COLORS.red;
   return COLORS.amber;
 };
 
@@ -117,9 +117,96 @@ export default function DispatchPage({ canEdit }) {
                 ))}
               </div>
             )}
+            {l.status === "Canceled - TONU" && <TonuPanel load={l} update={update} canEdit={canEdit} />}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function TonuPanel({ load, update, canEdit }) {
+  const [showDispute, setShowDispute] = useState(false);
+  const [disputeNote, setDisputeNote] = useState(load.tonu_notes || "");
+  const tonuStatus = load.tonu_status || "Pending";
+
+  function fileDispute() {
+    update(load.id, { tonu_status: "Disputed", tonu_notes: disputeNote });
+    setShowDispute(false);
+  }
+
+  return (
+    <div className="mt-1 p-3 rounded" style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}` }}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: COLORS.red }}>TONU \u2014 Truck Ordered, Not Used</span>
+        <Pill color={tonuStatusColor(tonuStatus)}>{tonuStatus}</Pill>
+      </div>
+
+      {canEdit ? (
+        <>
+          <div className="flex flex-wrap gap-2 mb-2">
+            <Field label="TONU Fee ($)">
+              <input
+                style={{ ...inputStyle, width: 130 }}
+                type="number"
+                value={load.tonu_amount || ""}
+                onChange={(e) => update(load.id, { tonu_amount: e.target.value === "" ? null : e.target.value })}
+                placeholder="150"
+              />
+            </Field>
+            <Field label="Status">
+              <select
+                style={{ ...inputStyle, width: 140 }}
+                value={tonuStatus}
+                onChange={(e) => update(load.id, { tonu_status: e.target.value })}
+              >
+                {TONU_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+          </div>
+
+          {!showDispute ? (
+            <button
+              onClick={() => setShowDispute(true)}
+              className="px-2 py-1 text-[11px] font-bold uppercase rounded"
+              style={{ border: `1px solid ${COLORS.red}`, color: COLORS.red }}
+            >
+              Dispute TONU
+            </button>
+          ) : (
+            <div className="mt-1">
+              <Field label="Dispute Reason">
+                <textarea
+                  style={{ ...inputStyle, width: "100%" }}
+                  rows={2}
+                  value={disputeNote}
+                  onChange={(e) => setDisputeNote(e.target.value)}
+                  placeholder="e.g. Broker claims driver never confirmed dispatch \u2014 pushing back with dispatch log timestamps."
+                />
+              </Field>
+              <div className="flex gap-2 mt-2">
+                <button onClick={fileDispute} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#2A0C0C" }}>
+                  File Dispute
+                </button>
+                <button onClick={() => setShowDispute(false)} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tonuStatus === "Disputed" && load.tonu_notes && !showDispute && (
+            <div className="mt-2 text-xs" style={{ color: COLORS.muted }}>
+              <span className="font-bold uppercase" style={{ color: COLORS.red }}>Dispute note: </span>{load.tonu_notes}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-xs" style={{ color: COLORS.muted }}>
+          {load.tonu_amount && <span>Fee: {money(load.tonu_amount)} </span>}
+          {load.tonu_notes && <span>\u2014 {load.tonu_notes}</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -62,6 +62,13 @@ export function sanitizeForInsert(obj) {
   return out;
 }
 
+export const TONU_STATUSES = ["Pending", "Invoiced", "Paid", "Disputed"];
+export function tonuStatusColor(s) {
+  if (s === "Paid") return COLORS.green;
+  if (s === "Disputed") return COLORS.red;
+  return COLORS.amber; // Pending, Invoiced
+}
+
 export function daysUntil(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr + "T00:00:00");

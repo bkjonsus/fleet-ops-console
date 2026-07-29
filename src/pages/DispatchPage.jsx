@@ -138,7 +138,7 @@ function TonuPanel({ load, update, canEdit }) {
   return (
     <div className="mt-1 p-3 rounded" style={{ background: COLORS.bg, border: `1px solid ${COLORS.red}` }}>
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: COLORS.red }}>TONU \u2014 Truck Ordered, Not Used</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: COLORS.red }}>TONU — Truck Ordered, Not Used</span>
         <Pill color={tonuStatusColor(tonuStatus)}>{tonuStatus}</Pill>
       </div>
 
@@ -204,7 +204,7 @@ function TonuPanel({ load, update, canEdit }) {
       ) : (
         <div className="text-xs" style={{ color: COLORS.muted }}>
           {load.tonu_amount && <span>Fee: {money(load.tonu_amount)} </span>}
-          {load.tonu_notes && <span>\u2014 {load.tonu_notes}</span>}
+          {load.tonu_notes && <span>— {load.tonu_notes}</span>}
         </div>
       )}
     </div>

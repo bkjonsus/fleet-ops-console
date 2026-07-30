@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 
 export const COLORS = {
-  bg: "#0F1620",
-  surface: "#1A2431",
-  surfaceAlt: "#20293A",
-  line: "#2C3948",
-  amber: "#FFB627",
-  green: "#2FBF71",
-  red: "#E5484D",
-  text: "#EDF1F5",
-  muted: "#8DA0B3",
+  bg: "#EEF4F9",
+  surface: "#FFFFFF",
+  surfaceAlt: "#E1EBF3",
+  line: "#C9D9E6",
+  amber: "#14487A",
+  green: "#1E8A5F",
+  red: "#C0392B",
+  text: "#12202E",
+  muted: "#6C8299",
 };
 
 export const inputStyle = {
@@ -87,6 +87,36 @@ export function returnLabel(days) {
   if (days === 0) return "Due today";
   return `Due in ${days}d`;
 }
+
+// Same idea as returnColor/returnLabel but tuned for document expiry (30-day amber
+// window instead of 3-day, since docs need more lead time to renew than a rental return).
+export function docColor(days) {
+  if (days === null) return COLORS.muted;
+  if (days < 0) return COLORS.red;
+  if (days <= 30) return COLORS.amber;
+  return COLORS.green;
+}
+export function docLabel(days) {
+  if (days === null) return "No expiry set";
+  if (days < 0) return `Expired ${Math.abs(days)}d ago`;
+  if (days === 0) return "Expires today";
+  return `Expires in ${days}d`;
+}
+
+const CAN_EDIT_LOADS_ROLES = ["admin", "dispatch", "ops_viewer"];
+const IN_TRANSIT_STATUSES = ["En Route", "At Pickup", "In Transit", "Delayed"];
+const HISTORY_STATUSES = ["Delivered", "Canceled", "TONU"];
+// Editing full load details (not status) is tiered by where the load is in its lifecycle:
+// Upcoming = normal dispatch permissions; In Transit or History = only Admin or Fleet
+// Manager, so Dispatch can't alter a load once it's moving or already closed out.
+export function canEditLoadInfo(load, role) {
+  if (role === "admin") return true;
+  if (HISTORY_STATUSES.includes(load.status)) {
+    return role === "fleet";
+  }
+  return CAN_EDIT_LOADS_ROLES.includes(role) || role === "fleet";
+}
+export { IN_TRANSIT_STATUSES, HISTORY_STATUSES };
 
 export function Pill({ children, color }) {
   return (

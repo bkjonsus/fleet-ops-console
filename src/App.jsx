@@ -82,7 +82,7 @@ function Shell() {
       </div>
 
       <div className="p-4">
-        {activeTab === "dispatch" && <DispatchPage canEdit={CAN_EDIT_LOADS.includes(role)} />}
+        {activeTab === "dispatch" && <DispatchPage canEdit={CAN_EDIT_LOADS.includes(role)} role={role} />}
         {activeTab === "fleet" && <FleetPage canEdit={CAN_EDIT_FLEET.includes(role)} />}
         {activeTab === "accounting" && <AccountingPage canEdit={CAN_EDIT_MONEY.includes(role)} canViewMoney={CAN_VIEW_MONEY.includes(role)} />}
         {activeTab === "team" && role === "admin" && <TeamPage />}

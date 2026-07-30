@@ -1,25 +1,30 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2 } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon } from "lucide-react";
 import { useTable } from "../useTable";
 import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime,
   todayISO, sanitizeForInsert, TONU_STATUSES, tonuStatusColor, getStops, shortLocation,
   formatDateTimeCompact, ratePerMile, generateCode, useIsMobile, StopCircle,
-  DRIVER_BOARD_STATUSES, driverBoardStatusColor, uid,
+  DRIVER_BOARD_STATUSES, driverBoardStatusColor, uid, canEditLoadInfo, IN_TRANSIT_STATUSES, HISTORY_STATUSES,
 } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled", "TONU"];
 const statusColor = (s) => {
-  if (s === "Delivered") return COLORS.green;
-  if (["Delayed", "Canceled", "TONU"].includes(s)) return COLORS.red;
+  if (["Delivered", "Paid"].includes(s)) return COLORS.green;
+  if (["Delayed", "Overdue", "Canceled", "TONU", "Not Assigned"].includes(s)) return COLORS.red;
   return COLORS.amber;
 };
+function loadStatusLabel(load) {
+  const showDriverInstead = ["Assigned", "En Route", "At Pickup", "In Transit", "Delayed", "Delivered"];
+  if (showDriverInstead.includes(load.status)) return load.driver || "Not Assigned";
+  return load.status;
+}
 
 function blankLoad() {
   return {
-    load_number: "", driver: "", truck: "", rate: "", miles: "", status: "Assigned", notes: "",
+    load_number: "", driver: "", truck: "", rate: "", miles: "", status: "Assigned", notes: "", broker: "",
     stops: [
       { id: uid(), location: "", date: todayISO(), time: "" },
       { id: uid(), location: "", date: "", time: "" },
@@ -27,21 +32,62 @@ function blankLoad() {
   };
 }
 
-export default function DispatchPage({ canEdit }) {
+function ZipLookupInput({ onResolved }) {
+  const [zip, setZip] = useState("");
+  const [status, setStatus] = useState("");
+
+  async function tryLookup(z) {
+    if (!/^\d{5}$/.test(z)) return;
+    setStatus("looking");
+    try {
+      const res = await fetch(`https://api.zippopotam.us/us/${z}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const place = data.places && data.places[0];
+      if (!place) throw new Error();
+      onResolved(`${place["place name"]}, ${place["state abbreviation"]}`);
+      setStatus("");
+      setZip("");
+    } catch {
+      setStatus("notfound");
+    }
+  }
+
+  return (
+    <div className="flex gap-1 items-center">
+      <input
+        style={{ ...inputStyle, width: 90, fontSize: 12, padding: "5px 8px" }}
+        value={zip}
+        maxLength={5}
+        placeholder="ZIP"
+        onChange={(e) => { const v = e.target.value.replace(/\D/g, ""); setZip(v); setStatus(""); if (v.length === 5) tryLookup(v); }}
+        onBlur={() => tryLookup(zip)}
+      />
+      {status === "looking" && <span className="text-[10px]" style={{ color: COLORS.muted }}>Looking up…</span>}
+      {status === "notfound" && <span className="text-[10px]" style={{ color: COLORS.amber }}>Lookup unavailable</span>}
+    </div>
+  );
+}
+
+export default function DispatchPage({ canEdit, role }) {
   const { rows: loads, loading, error, insert, update, remove } = useTable("loads");
   const { rows: drivers } = useTable("drivers", "name", true);
   const { rows: trucks } = useTable("trucks", "unit_number", true);
+  const { rows: invoices } = useTable("invoices");
   const { profile } = useAuth();
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
 
-  const [dispatchView, setDispatchView] = useState("loads");
+  const [dispatchView, setDispatchView] = useState("driver board");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blankLoad());
   const [showFilters, setShowFilters] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterDriver, setFilterDriver] = useState("All");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
   const [showPrintView, setShowPrintView] = useState(false);
+
+  const UPCOMING_STATUSES = ["Assigned"];
 
   function addStopToForm() {
     const newStops = [...form.stops];
@@ -57,7 +103,7 @@ export default function DispatchPage({ canEdit }) {
   }
 
   async function save() {
-    if (!form.load_number || !form.driver) return;
+    if (!form.load_number) return;
     const payload = sanitizeForInsert({ ...form, booked_by: currentUserLabel });
     const { error } = await insert(payload);
     if (!error) {
@@ -68,7 +114,9 @@ export default function DispatchPage({ canEdit }) {
 
   const driverOptions = Array.from(new Set([...(drivers || []).map((d) => d.name), ...loads.map((l) => l.driver)].filter(Boolean)));
 
+  const viewStatuses = dispatchView === "upcoming" ? UPCOMING_STATUSES : dispatchView === "in transit" ? IN_TRANSIT_STATUSES : HISTORY_STATUSES;
   const filteredLoads = loads.filter((l) => {
+    if (dispatchView !== "driver board" && !viewStatuses.includes(l.status)) return false;
     if (filterDriver !== "All" && l.driver !== filterDriver) return false;
     if (filterFrom || filterTo) {
       const firstDate = getStops(l)[0]?.date || "";
@@ -78,7 +126,6 @@ export default function DispatchPage({ canEdit }) {
     }
     return true;
   });
-  const grossTotal = filteredLoads.reduce((s, l) => s + Number(l.rate || 0), 0);
   const filtersActive = filterDriver !== "All" || filterFrom || filterTo;
 
   function exportToExcel() {
@@ -91,6 +138,7 @@ export default function DispatchPage({ canEdit }) {
         "Status": l.status,
         "Driver": l.driver,
         "Truck": l.truck || "",
+        "Broker": l.broker || "",
         "Rate": Number(l.rate) || 0,
         "Miles": Number(l.miles) || 0,
         "Rate/Mile": l.rate && l.miles ? Number((Number(l.rate) / Number(l.miles)).toFixed(2)) : "",
@@ -121,8 +169,8 @@ export default function DispatchPage({ canEdit }) {
     <div>
       <ErrorBanner message={error} />
 
-      <div className="flex gap-1 mb-2">
-        {["loads", "driver board"].map((v) => (
+      <div className="flex items-center gap-1 mb-2 flex-wrap">
+        {["driver board", "upcoming", "in transit", "history"].map((v) => (
           <button
             key={v}
             onClick={() => setDispatchView(v)}
@@ -136,6 +184,35 @@ export default function DispatchPage({ canEdit }) {
             {v}
           </button>
         ))}
+        {dispatchView !== "driver board" && (
+          <div className="flex items-center gap-1.5 relative ml-auto">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              title="Filter"
+              className="relative flex items-center justify-center rounded-full"
+              style={{ width: 28, height: 28, background: showFilters ? COLORS.surfaceAlt : "transparent", border: `1px solid ${filtersActive ? COLORS.amber : COLORS.line}`, color: filtersActive ? COLORS.amber : COLORS.muted }}
+            >
+              <FilterIcon size={13} />
+              {filtersActive && <span style={{ position: "absolute", top: 2, right: 2, width: 6, height: 6, borderRadius: 999, background: COLORS.amber }} />}
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                title="Download"
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 28, height: 28, background: showExportMenu ? COLORS.surfaceAlt : "transparent", border: `1px solid ${COLORS.line}`, color: COLORS.muted }}
+              >
+                <Download size={13} />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-1 rounded overflow-hidden z-10" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, minWidth: 100 }}>
+                  <button onClick={() => { exportToExcel(); setShowExportMenu(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.text }}>Excel</button>
+                  <button onClick={() => { setShowPrintView(true); setShowExportMenu(false); }} className="w-full text-left px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.text, borderTop: `1px solid ${COLORS.line}` }}>PDF</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {dispatchView === "driver board" ? (
@@ -143,30 +220,14 @@ export default function DispatchPage({ canEdit }) {
       ) : (
         <>
           <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>
-              Active Loads <span style={{ color: COLORS.muted }}>({filteredLoads.length}{filtersActive ? `/${loads.length}` : ""})</span>
-            </h2>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold uppercase rounded relative"
-                style={{ background: showFilters ? COLORS.surfaceAlt : "transparent", border: `1px solid ${filtersActive ? COLORS.amber : COLORS.line}`, color: filtersActive ? COLORS.amber : COLORS.muted }}
-              >
-                Filter
-                {filtersActive && <span style={{ width: 6, height: 6, borderRadius: 999, background: COLORS.amber, marginLeft: 2 }} />}
+            {canEdit && dispatchView === "upcoming" ? (
+              <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.amber, color: COLORS.bg }}>
+                <Plus size={13} /> New Load
               </button>
-              <button onClick={exportToExcel} className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold uppercase rounded" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.muted }}>
-                <Download size={12} /> Excel
-              </button>
-              <button onClick={() => setShowPrintView(true)} className="flex items-center gap-1 px-2 py-1.5 text-[11px] font-bold uppercase rounded" style={{ border: `1px solid ${COLORS.line}`, color: COLORS.muted }}>
-                <Printer size={12} /> PDF
-              </button>
-              {canEdit && (
-                <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ background: COLORS.amber, color: COLORS.bg }}>
-                  <Plus size={14} /> New Load
-                </button>
-              )}
-            </div>
+            ) : <span />}
+            <span className="text-sm font-bold" style={{ color: COLORS.muted }}>
+              {filteredLoads.length}{filtersActive ? `/${loads.filter((l) => viewStatuses.includes(l.status)).length}` : ""} load{filteredLoads.length === 1 ? "" : "s"}
+            </span>
           </div>
 
           {showFilters && (
@@ -185,20 +246,15 @@ export default function DispatchPage({ canEdit }) {
                   <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", width: "100%" }} type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
                 </Field>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono" style={{ color: COLORS.muted }}>
-                  Gross: <span className="font-bold" style={{ color: COLORS.green }}>{money(grossTotal)}</span> ({filteredLoads.length} load{filteredLoads.length === 1 ? "" : "s"})
-                </span>
-                {filtersActive && (
-                  <button onClick={() => { setFilterDriver("All"); setFilterFrom(""); setFilterTo(""); }} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>
-                    Clear
-                  </button>
-                )}
-              </div>
+              {filtersActive && (
+                <button onClick={() => { setFilterDriver("All"); setFilterFrom(""); setFilterTo(""); }} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>
+                  Clear
+                </button>
+              )}
             </div>
           )}
 
-          {showForm && canEdit && (
+          {showForm && canEdit && dispatchView === "upcoming" && (
             <Panel title="New Load" onClose={() => setShowForm(false)}>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Load #">
@@ -217,6 +273,7 @@ export default function DispatchPage({ canEdit }) {
                 </Field>
                 <Field label="Rate"><input style={inputStyle} type="number" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} placeholder="2200" /></Field>
                 <Field label="Miles (total)"><input style={inputStyle} type="number" value={form.miles} onChange={(e) => setForm({ ...form, miles: e.target.value })} placeholder="480" /></Field>
+                <Field label="Broker"><input style={inputStyle} value={form.broker} onChange={(e) => setForm({ ...form, broker: e.target.value })} placeholder="Broker / customer name" /></Field>
               </div>
 
               <div className="mt-3">
@@ -232,7 +289,12 @@ export default function DispatchPage({ canEdit }) {
                         )}
                       </div>
                       <div className="grid grid-cols-1 gap-2">
-                        <Field label="Location"><input style={inputStyle} value={s.location} onChange={(e) => updateStopField(s.id, "location", e.target.value)} placeholder="Dallas, TX" /></Field>
+                        <Field label="Location">
+                          <div className="flex gap-1.5 flex-wrap items-center">
+                            <input style={{ ...inputStyle, flex: 1, minWidth: 120 }} value={s.location} onChange={(e) => updateStopField(s.id, "location", e.target.value)} placeholder="Dallas, TX" />
+                            <ZipLookupInput onResolved={(cityState) => updateStopField(s.id, "location", cityState)} />
+                          </div>
+                        </Field>
                         <div className="flex gap-2">
                           <Field label="Date"><input style={{ ...inputStyle, width: 130 }} type="date" value={s.date} onChange={(e) => updateStopField(s.id, "date", e.target.value)} /></Field>
                           <Field label="Time"><input style={{ ...inputStyle, width: 110 }} type="time" value={s.time} onChange={(e) => updateStopField(s.id, "time", e.target.value)} /></Field>
@@ -259,7 +321,7 @@ export default function DispatchPage({ canEdit }) {
 
           <div className="flex flex-col gap-1">
             {filteredLoads.map((l) => (
-              <LoadRow key={l.id} load={l} drivers={drivers} trucks={trucks} update={update} remove={remove} canEdit={canEdit} />
+              <LoadRow key={l.id} load={l} drivers={drivers} trucks={trucks} invoices={invoices} isHistory={dispatchView === "history"} role={role} update={update} remove={remove} canEdit={canEdit} />
             ))}
           </div>
         </>
@@ -268,7 +330,38 @@ export default function DispatchPage({ canEdit }) {
   );
 }
 
-function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
+function AssignedBadge({ load: l, drivers, update, canEditInfo }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const canReassign = canEditInfo && (l.status === "Assigned" || IN_TRANSIT_STATUSES.includes(l.status));
+
+  if (!canReassign) {
+    return <Pill color={statusColor(l.status)}>{loadStatusLabel(l)}</Pill>;
+  }
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => setShowPicker(!showPicker)} title="Click to change driver" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+        <Pill color={statusColor(l.status)}>{loadStatusLabel(l)}</Pill>
+      </button>
+      {showPicker && (
+        <div className="absolute right-0 mt-1 p-2 rounded z-10" style={{ background: COLORS.surface, border: `1px solid ${COLORS.amber}`, minWidth: 160 }}>
+          <div className="text-[10px] font-bold uppercase mb-1" style={{ color: COLORS.muted }}>Assign Driver</div>
+          <select
+            autoFocus
+            value={l.driver || ""}
+            onChange={(e) => { update(l.id, { driver: e.target.value }); setShowPicker(false); }}
+            style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", width: "100%" }}
+          >
+            <option value="">— none —</option>
+            {(drivers || []).map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, remove, canEdit }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
@@ -277,12 +370,25 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
   const first = stops[0] || {};
   const last = stops[stops.length - 1] || {};
   const totalStops = stops.length;
+  const canEditInfo = canEditLoadInfo(l, role);
+
+  const linkedInvoices = (invoices || []).filter((i) => i.load_number === l.load_number);
+  const paymentStatus = linkedInvoices.length === 0 ? (l.payment_status || "Not Invoiced")
+    : linkedInvoices.some((i) => i.status === "Paid") ? "Paid"
+    : linkedInvoices.some((i) => i.status === "Overdue") ? "Overdue"
+    : "Pending";
+  function paymentColor(s) {
+    if (s === "Paid") return COLORS.green;
+    if (s === "Overdue") return COLORS.red;
+    if (s === "Pending") return COLORS.amber;
+    return COLORS.muted;
+  }
 
   function startEdit(e) {
     if (e) e.stopPropagation();
     setEditForm({
       load_number: l.load_number, driver: l.driver, truck: l.truck || "",
-      rate: l.rate || "", miles: l.miles || "", notes: l.notes || "",
+      rate: l.rate || "", miles: l.miles || "", notes: l.notes || "", broker: l.broker || "",
       stops: getStops(l).map((s) => ({ ...s })),
     });
     setEditing(true);
@@ -291,7 +397,8 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
   async function saveEdit() {
     const payload = sanitizeForInsert({
       load_number: editForm.load_number, driver: editForm.driver, truck: editForm.truck,
-      rate: editForm.rate, miles: editForm.miles, notes: editForm.notes, stops: editForm.stops,
+      rate: editForm.rate, miles: editForm.miles, notes: editForm.notes, broker: editForm.broker,
+      stops: editForm.stops,
     });
     const { error } = await update(l.id, payload);
     if (!error) setEditing(false);
@@ -330,8 +437,9 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
               <span className="font-mono text-xs font-bold" style={{ color: COLORS.amber }}>{l.load_number}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Pill color={statusColor(l.status)}>{l.status}</Pill>
-              {canEdit && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
+              <AssignedBadge load={l} drivers={drivers} update={update} canEditInfo={canEditInfo} />
+              {isHistory && <Pill color={paymentColor(paymentStatus)}>{paymentStatus}</Pill>}
+              {canEditInfo && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
             </div>
           </div>
           <div className="flex items-center gap-1.5 mt-1.5 text-[11px]" style={{ color: COLORS.text }}>
@@ -348,7 +456,7 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
             <div className="mt-1 text-[10px] inline-block px-1 rounded" style={{ color: COLORS.muted, border: `1px solid ${COLORS.line}` }}>{totalStops} stops</div>
           )}
           <div className="flex items-center justify-between mt-1.5 text-[11px]" style={{ color: COLORS.muted }}>
-            <span><span className="font-bold" style={{ color: COLORS.text }}>{l.driver}</span>{(l.miles === 0 || l.miles) && ` \u00b7 ${l.miles} mi`}</span>
+            <span>{(l.miles === 0 || l.miles) && `${l.miles} mi`}</span>
             {(l.rate === 0 || l.rate) && (
               <span className="text-right">
                 <span className="font-mono font-bold" style={{ color: COLORS.text }}>{money(l.rate)}</span>
@@ -374,9 +482,7 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
             <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.text, flexShrink: 0 }}>
               {shortLocation(last.location) || "\u2014"} <span style={{ color: COLORS.muted }}>{formatDateTimeCompact(last.date, last.time)}</span>
             </span>
-            <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.muted, flexShrink: 0 }}>
-              {(l.miles === 0 || l.miles) && `${l.miles} mi \u00b7 `}<span className="font-bold" style={{ color: COLORS.text }}>{l.driver}</span>
-            </span>
+            {(l.miles === 0 || l.miles) && <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.muted, flexShrink: 0 }}>{l.miles} mi</span>}
           </div>
           <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
             {(l.rate === 0 || l.rate) && (
@@ -385,8 +491,9 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
                 {ratePerMile(l.rate, l.miles) && <span className="text-[9px] whitespace-nowrap" style={{ color: COLORS.muted }}>{ratePerMile(l.rate, l.miles)}</span>}
               </span>
             )}
-            <Pill color={statusColor(l.status)}>{l.status}</Pill>
-            {canEdit && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
+            <AssignedBadge load={l} drivers={drivers} update={update} canEditInfo={canEditInfo} />
+            {isHistory && <Pill color={paymentColor(paymentStatus)}>{paymentStatus}</Pill>}
+            {canEditInfo && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
           </div>
         </div>
       )}
@@ -409,32 +516,24 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
                 <span>Truck: {l.truck || "\u2014"}</span>
                 {(l.rate === 0 || l.rate) && <span>Rate: {money(l.rate)}{ratePerMile(l.rate, l.miles) && ` (${ratePerMile(l.rate, l.miles)})`}</span>}
                 {(l.miles === 0 || l.miles) && <span>Miles: {l.miles}</span>}
+                {l.broker && <span>Broker: {l.broker}</span>}
                 {l.booked_by && <span>Booked by: <span className="font-bold" style={{ color: COLORS.amber }}>{l.booked_by}</span></span>}
                 {l.notes && <span>Notes: {l.notes}</span>}
               </div>
 
               {canEdit && (
-                <div className="flex gap-1 flex-wrap">
-                  {LOAD_STATUSES.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setStatus(s)}
-                      className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded"
-                      style={{
-                        background: l.status === s ? statusColor(s) : "transparent",
-                        color: l.status === s ? COLORS.bg : COLORS.muted,
-                        border: `1px solid ${l.status === s ? statusColor(s) : COLORS.line}`,
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                <select
+                  value={l.status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{ ...inputStyle, fontSize: 11, padding: "4px 8px", color: statusColor(l.status), borderColor: statusColor(l.status) }}
+                >
+                  {LOAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
               )}
 
               {l.status === "TONU" && <TonuPanel load={l} update={update} canEdit={canEdit} />}
 
-              {canEdit && (
+              {canEditInfo && (
                 <div className="flex gap-3">
                   <button onClick={startEdit} className="text-[10px] font-bold uppercase self-start hover:opacity-70" style={{ color: COLORS.amber }}>Edit Load</button>
                   <button onClick={() => remove(l.id)} style={{ color: COLORS.muted }} className="text-[10px] font-bold uppercase self-start hover:opacity-70">Remove Load</button>
@@ -456,6 +555,7 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
                 </Field>
                 <Field label="Rate"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} type="number" value={editForm.rate} onChange={(e) => setEditForm({ ...editForm, rate: e.target.value })} /></Field>
                 <Field label="Miles"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} type="number" value={editForm.miles} onChange={(e) => setEditForm({ ...editForm, miles: e.target.value })} /></Field>
+                <Field label="Broker"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} value={editForm.broker} onChange={(e) => setEditForm({ ...editForm, broker: e.target.value })} /></Field>
               </div>
               {l.booked_by && <p className="text-[11px] mb-2" style={{ color: COLORS.muted }}>Booked by <span className="font-bold" style={{ color: COLORS.amber }}>{l.booked_by}</span> (not editable)</p>}
 
@@ -470,7 +570,12 @@ function LoadRow({ load: l, drivers, trucks, update, remove, canEdit }) {
                       <button onClick={() => removeEditStop(s.id)} style={{ color: COLORS.muted }}><Trash2 size={11} /></button>
                     )}
                   </div>
-                  <Field label="Location"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px", width: "100%" }} value={s.location} onChange={(e) => updateEditStop(s.id, "location", e.target.value)} /></Field>
+                  <Field label="Location">
+                    <div className="flex gap-1.5 flex-wrap items-center">
+                      <input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px", flex: 1, minWidth: 100 }} value={s.location} onChange={(e) => updateEditStop(s.id, "location", e.target.value)} />
+                      <ZipLookupInput onResolved={(cityState) => updateEditStop(s.id, "location", cityState)} />
+                    </div>
+                  </Field>
                   <div className="flex gap-2 mt-1.5">
                     <Field label="Date"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px", width: 120 }} type="date" value={s.date} onChange={(e) => updateEditStop(s.id, "date", e.target.value)} /></Field>
                     <Field label="Time"><input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px", width: 100 }} type="time" value={s.time} onChange={(e) => updateEditStop(s.id, "time", e.target.value)} /></Field>
@@ -574,7 +679,7 @@ function TonuPanel({ load, update, canEdit }) {
             />
           </Field>
           <div className="flex gap-2 mt-2">
-            <button onClick={fileDispute} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#2A0C0C" }}>File Dispute</button>
+            <button onClick={fileDispute} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#FFFFFF" }}>File Dispute</button>
             <button onClick={() => setShowDispute(false)} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
           </div>
         </div>
@@ -589,8 +694,35 @@ function TonuPanel({ load, update, canEdit }) {
   );
 }
 
+function ReadinessEditor({ driver, onSave, onCancel }) {
+  const [date, setDate] = useState(driver.ready_date || "");
+  const [time, setTime] = useState(driver.ready_time || "");
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", width: 130 }} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px", width: 100 }} type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+      <button onClick={() => onSave(date, time)} className="text-[10px] font-bold uppercase px-2 py-1 rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save</button>
+      <button onClick={onCancel} className="text-[10px] font-bold uppercase" style={{ color: COLORS.muted }}>Cancel</button>
+    </div>
+  );
+}
+
+function DispatchNoteField({ driver, updateDriver }) {
+  const [value, setValue] = useState(driver.dispatch_note || "");
+  return (
+    <input
+      style={{ ...inputStyle, fontSize: 11, padding: "5px 8px", width: "100%" }}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => { if (value !== (driver.dispatch_note || "")) updateDriver(driver.id, { dispatch_note: value }); }}
+      placeholder="Reply or send a message to this driver\u2026"
+    />
+  );
+}
+
 function DriverBoardPanel({ loads, drivers, canEdit }) {
   const { update: updateDriver } = useTable("drivers", "name", true);
+  const [editingReady, setEditingReady] = useState(null);
   const activeStatuses = ["Assigned", "En Route", "At Pickup", "In Transit"];
 
   function driverActiveLoad(driverName) {
@@ -598,6 +730,11 @@ function DriverBoardPanel({ loads, drivers, canEdit }) {
   }
 
   const rows = (drivers || []).filter((d) => d.status !== "Inactive").map((d) => ({ driver: d, activeLoad: driverActiveLoad(d.name) }));
+
+  function saveReadiness(driverId, date, time) {
+    updateDriver(driverId, { ready_date: date, ready_time: time });
+    setEditingReady(null);
+  }
 
   return (
     <div>
@@ -607,34 +744,62 @@ function DriverBoardPanel({ loads, drivers, canEdit }) {
       {rows.length === 0 && <EmptyState text="No active drivers on the roster yet." />}
       <div className="flex flex-col gap-1.5">
         {rows.map(({ driver: d, activeLoad }) => {
-          const status = d.board_status || (activeLoad ? "In Route" : "Ready");
+          const boardStatus = d.board_status || (activeLoad ? "In Route" : "Ready");
           return (
             <div key={d.id} className="p-2 rounded flex flex-wrap items-center gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
               <div className="flex items-center gap-2 flex-wrap" style={{ flex: "1 1 260px" }}>
                 <span className="text-xs font-bold whitespace-nowrap" style={{ color: COLORS.text }}>{d.name}</span>
                 {canEdit ? (
                   <select
-                    value={status}
+                    value={boardStatus}
                     onChange={(e) => updateDriver(d.id, { board_status: e.target.value })}
-                    style={{ ...inputStyle, fontSize: 11, padding: "3px 6px", color: driverBoardStatusColor(status), borderColor: driverBoardStatusColor(status) }}
+                    style={{ ...inputStyle, fontSize: 11, padding: "3px 6px", color: driverBoardStatusColor(boardStatus), borderColor: driverBoardStatusColor(boardStatus) }}
                   >
                     {DRIVER_BOARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 ) : (
-                  <Pill color={driverBoardStatusColor(status)}>{status}</Pill>
+                  <Pill color={driverBoardStatusColor(boardStatus)}>{boardStatus}</Pill>
                 )}
                 {activeLoad && (
                   <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.muted }}>
                     Load {activeLoad.load_number}
                   </span>
                 )}
-                {!activeLoad && d.ready_date && (
-                  <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.muted }}>
-                    Ready: {formatDateTimeCompact(d.ready_date, d.ready_time)}
-                  </span>
+                {!activeLoad && canEdit && boardStatus !== "Ready" && (
+                  editingReady === d.id ? (
+                    <ReadinessEditor driver={d} onSave={(date, time) => saveReadiness(d.id, date, time)} onCancel={() => setEditingReady(null)} />
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-[11px] whitespace-nowrap" style={{ color: COLORS.muted }}>
+                        {d.ready_date ? `Ready: ${formatDateTimeCompact(d.ready_date, d.ready_time)}` : "No readiness time set"}
+                        {d.ready_city && ` \u00b7 ${d.ready_city}`}
+                      </span>
+                      <button onClick={() => setEditingReady(d.id)} className="text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>
+                        {d.ready_date ? "Edit" : "Set"}
+                      </button>
+                    </span>
+                  )
                 )}
               </div>
-              {d.board_note && <div style={{ flex: "1 1 220px", color: COLORS.muted }} className="text-[11px]">{d.board_note}</div>}
+              <div style={{ flex: "1 1 260px" }} className="flex flex-col gap-1">
+                {d.board_note && (
+                  <div className="text-[11px]" style={{ color: COLORS.muted }}>
+                    <span className="font-bold" style={{ color: COLORS.text }}>Driver: </span>{d.board_note}
+                  </div>
+                )}
+                {canEdit ? (
+                  <div>
+                    <span className="text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>Message to driver</span>
+                    <DispatchNoteField driver={d} updateDriver={updateDriver} />
+                  </div>
+                ) : (
+                  d.dispatch_note && (
+                    <div className="text-[11px]" style={{ color: COLORS.muted }}>
+                      <span className="font-bold" style={{ color: COLORS.amber }}>Dispatch: </span>{d.dispatch_note}
+                    </div>
+                  )
+                )}
+              </div>
             </div>
           );
         })}

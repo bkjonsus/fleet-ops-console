@@ -372,7 +372,7 @@ function LoadBoardPanel({ loads, invoices, insertInvoice, updateLoad, currentUse
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={saveQuickInvoice} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>Save Invoice</button>
+                        <button onClick={saveQuickInvoice} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Invoice</button>
                         <button onClick={() => { setQuickInvoiceFor(null); setQForm(null); }} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
                       </div>
                     </div>
@@ -459,7 +459,7 @@ function InvoicesPanel({ table, loads, currentUser, setViewingInvoiceId, canEdit
               <Field label="Factoring Company"><input style={inputStyle} value={form.factoring_company} onChange={(e) => setForm({ ...form, factoring_company: e.target.value })} placeholder="RTS Financial" /></Field>
             )}
           </div>
-          <button onClick={save} className="mt-3 px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>Save Invoice</button>
+          <button onClick={save} className="mt-3 px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Invoice</button>
         </Panel>
       )}
 
@@ -487,7 +487,7 @@ function InvoicesPanel({ table, loads, currentUser, setViewingInvoiceId, canEdit
               </div>
               {i.created_by && <p className="text-[11px] mb-2" style={{ color: COLORS.muted }}>Created by <span className="font-bold" style={{ color: COLORS.amber }}>{i.created_by}</span> (not editable)</p>}
               <div className="flex gap-2">
-                <button onClick={saveEdit} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>Save Changes</button>
+                <button onClick={saveEdit} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Changes</button>
                 <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
               </div>
             </div>
@@ -631,7 +631,7 @@ function ExpensesPanel({ table, loads, drivers, currentUser, canEdit }) {
           <div className="mt-3">
             <Field label="Description"><input style={{ ...inputStyle, width: "100%" }} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
           </div>
-          <button onClick={save} className="mt-3 px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>Save Expense</button>
+          <button onClick={save} className="mt-3 px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Expense</button>
         </Panel>
       )}
 
@@ -658,7 +658,7 @@ function ExpensesPanel({ table, loads, drivers, currentUser, canEdit }) {
               <Field label="Description"><input style={{ ...inputStyle, fontSize: 12, width: "100%" }} value={editForm.description} onChange={(ev) => setEditForm({ ...editForm, description: ev.target.value })} /></Field>
               {e.created_by && <p className="text-[11px] mt-2" style={{ color: COLORS.muted }}>Created by <span className="font-bold" style={{ color: COLORS.amber }}>{e.created_by}</span> (not editable)</p>}
               <div className="flex gap-2 mt-2">
-                <button onClick={saveEdit} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>Save Changes</button>
+                <button onClick={saveEdit} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>Save Changes</button>
                 <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
               </div>
             </div>
@@ -862,7 +862,7 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
             <div className="text-xs font-mono" style={{ color: COLORS.muted }}>
               Gross {money(gross)} − Deductions {money(totalDeductions)} = <span className="font-bold ml-1" style={{ color: net >= 0 ? COLORS.green : COLORS.red }}>{money(net)} net</span>
             </div>
-            <button onClick={save} className="px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#FFFFFF" }}>
+            <button onClick={save} className="px-4 py-2 text-xs font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F" }}>
               {editingId ? "Save Changes" : "Save Statement"}
             </button>
           </div>

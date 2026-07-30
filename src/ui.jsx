@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 
 export const COLORS = {
-  bg: "#EEF4F9",
-  surface: "#FFFFFF",
-  surfaceAlt: "#E1EBF3",
-  line: "#C9D9E6",
-  amber: "#14487A",
-  green: "#1E8A5F",
-  red: "#C0392B",
-  text: "#12202E",
-  muted: "#6C8299",
+  bg: "#0B1119",
+  surface: "#161F2C",
+  surfaceAlt: "#1C2735",
+  line: "#2A3646",
+  amber: "#FFB627",
+  green: "#2FBF71",
+  red: "#E5484D",
+  text: "#EDF1F5",
+  muted: "#8DA0B3",
 };
 
 export const inputStyle = {

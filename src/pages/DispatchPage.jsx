@@ -679,7 +679,7 @@ function TonuPanel({ load, update, canEdit }) {
             />
           </Field>
           <div className="flex gap-2 mt-2">
-            <button onClick={fileDispute} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#FFFFFF" }}>File Dispute</button>
+            <button onClick={fileDispute} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#2A0C0C" }}>File Dispute</button>
             <button onClick={() => setShowDispute(false)} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
           </div>
         </div>

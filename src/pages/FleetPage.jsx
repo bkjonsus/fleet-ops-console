@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { useTable } from "../useTable";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert } from "../ui";
+import { useDocuments } from "../useDocuments";
+import { useAuth } from "../AuthContext";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert, DocumentsSection, HasDocsBadge } from "../ui";
 
 const CONTRACT_TYPES = ["Company - Per Mile", "Company - Percentage", "Owner Operator", "Lease Driver (Truck & Trailer)"];
 const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
@@ -10,6 +12,9 @@ const TRAILER_TYPES = ["Dry Van", "Reefer", "Flatbed", "Step Deck", "Other"];
 
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
+  const docs = useDocuments();
+  const { profile } = useAuth();
+  const currentUser = profile?.full_name || profile?.role || "Unknown";
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-4">
@@ -28,16 +33,17 @@ export default function FleetPage({ canEdit }) {
           </button>
         ))}
       </div>
-      {subTab === "drivers" && <DriversPanel canEdit={canEdit} />}
-      {subTab === "trucks" && <TrucksPanel canEdit={canEdit} />}
-      {subTab === "trailers" && <TrailersPanel canEdit={canEdit} />}
+      {subTab === "drivers" && <DriversPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
+      {subTab === "trucks" && <TrucksPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
+      {subTab === "trailers" && <TrailersPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
     </div>
   );
 }
 
-function DriversPanel({ canEdit }) {
+function DriversPanel({ canEdit, docs, currentUser }) {
   const { rows: drivers, error, insert, update, remove } = useTable("drivers", "name", true);
   const [showForm, setShowForm] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({
     name: "", phone: "", cdl_number: "", cdl_issue_date: "", cdl_expiry_date: "",
     contract_type: CONTRACT_TYPES[0], per_mile_rate: "", percentage_rate: "", dispatch_fee_percent: "",
@@ -107,8 +113,9 @@ function DriversPanel({ canEdit }) {
           return (
             <div key={d.id} className="p-3 rounded flex flex-col gap-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap cursor-pointer" onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
                   <span className="text-sm font-bold" style={{ color: COLORS.text }}>{d.name}</span>
+                  <HasDocsBadge documents={docs.documents} category="Driver" linkedTo={d.name} />
                   <Pill color={d.status === "Active" ? COLORS.green : COLORS.muted}>{d.status}</Pill>
                   <Pill color={COLORS.amber}>{d.contract_type}</Pill>
                   {d.cdl_expiry_date && <Pill color={returnColor(cdlDays)}>CDL {returnLabel(cdlDays)}</Pill>}
@@ -124,6 +131,21 @@ function DriversPanel({ canEdit }) {
                 {d.assigned_truck && <span>Truck: {d.assigned_truck}</span>}
                 {d.assigned_trailer && <span>Trailer: {d.assigned_trailer}</span>}
               </div>
+              {expandedId === d.id && (
+                <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                  <DocumentsSection
+                    documents={docs.documents}
+                    category="Driver"
+                    linkedTo={d.name}
+                    docTypes={["CDL", "Medical Card / DOT Physical", "Drug & Alcohol Test", "Driving Record (MVR)", "Other"]}
+                    uploadDocument={docs.uploadDocument}
+                    deleteDocument={docs.deleteDocument}
+                    viewDocument={docs.viewDocument}
+                    currentUser={currentUser}
+                    canEdit={canEdit}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -132,9 +154,10 @@ function DriversPanel({ canEdit }) {
   );
 }
 
-function TrucksPanel({ canEdit }) {
+function TrucksPanel({ canEdit, docs, currentUser }) {
   const { rows: trucks, error, insert, remove } = useTable("trucks", "unit_number", true);
   const [showForm, setShowForm] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({ unit_number: "", year: "", make: "", model: "", vin: "", ownership: TRUCK_OWNERSHIP[0], assigned_driver: "", rented_from: "", rental_start: todayISO(), return_date: "", notes: "" });
   const [form, setForm] = useState(blank());
   const rentals = trucks.filter((t) => t.ownership === "Rental" && t.return_date).sort((a, b) => a.return_date.localeCompare(b.return_date));
@@ -199,24 +222,40 @@ function TrucksPanel({ canEdit }) {
 
       <div className="flex flex-col gap-2">
         {trucks.map((t) => (
-          <div key={t.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
+          <div key={t.id} className="p-3 rounded flex flex-col gap-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap cursor-pointer" onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
                 <span className="font-mono text-sm font-bold" style={{ color: COLORS.amber }}>Unit {t.unit_number}</span>
+                <HasDocsBadge documents={docs.documents} category="Truck" linkedTo={t.unit_number} />
                 <Pill color={t.ownership === "Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
               </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.text }}>
-                {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
-              </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}
-                {t.ownership === "Rental" && t.rented_from && `From: ${t.rented_from} \u00b7 `}
-                {t.ownership === "Rental" && t.return_date && `Return: ${formatDate(t.return_date)}`}
-              </div>
+              {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
             </div>
-            {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+            <div className="text-xs mt-1" style={{ color: COLORS.text }}>
+              {[t.year, t.make, t.model].filter(Boolean).join(" ")}
+              {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
+            </div>
+            <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+              {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}
+              {t.ownership === "Rental" && t.rented_from && `From: ${t.rented_from} \u00b7 `}
+              {t.ownership === "Rental" && t.return_date && `Return: ${formatDate(t.return_date)}`}
+            </div>
+            {expandedId === t.id && (
+              <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                <DocumentsSection
+                  documents={docs.documents}
+                  category="Truck"
+                  linkedTo={t.unit_number}
+                  docTypes={["Registration", "Insurance Card", "Annual DOT Inspection", "IFTA Decal", "Other"]}
+                  uploadDocument={docs.uploadDocument}
+                  deleteDocument={docs.deleteDocument}
+                  viewDocument={docs.viewDocument}
+                  currentUser={currentUser}
+                  canEdit={canEdit}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -224,9 +263,10 @@ function TrucksPanel({ canEdit }) {
   );
 }
 
-function TrailersPanel({ canEdit }) {
+function TrailersPanel({ canEdit, docs, currentUser }) {
   const { rows: trailers, error, insert, remove } = useTable("trailers", "trailer_number", true);
   const [showForm, setShowForm] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({ trailer_number: "", trailer_type: TRAILER_TYPES[0], year: "", make: "", model: "", vin: "", ownership: TRAILER_OWNERSHIP[0], assigned_driver: "", rented_from: "", rental_start: todayISO(), return_date: "", notes: "" });
   const [form, setForm] = useState(blank());
   const rentals = trailers.filter((t) => t.ownership === "Short-Term Rental" && t.return_date).sort((a, b) => a.return_date.localeCompare(b.return_date));
@@ -296,25 +336,41 @@ function TrailersPanel({ canEdit }) {
 
       <div className="flex flex-col gap-2">
         {trailers.map((t) => (
-          <div key={t.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
+          <div key={t.id} className="p-3 rounded flex flex-col gap-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap cursor-pointer" onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}>
                 <span className="font-mono text-sm font-bold" style={{ color: COLORS.amber }}>Trailer {t.trailer_number}</span>
+                <HasDocsBadge documents={docs.documents} category="Trailer" linkedTo={t.trailer_number} />
                 <Pill color={COLORS.muted}>{t.trailer_type}</Pill>
                 <Pill color={t.ownership === "Short-Term Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Short-Term Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
               </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.text }}>
-                {[t.year, t.make, t.model].filter(Boolean).join(" ")}
-                {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
-              </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}
-                {t.ownership === "Short-Term Rental" && t.rented_from && `From: ${t.rented_from} \u00b7 `}
-                {t.ownership === "Short-Term Rental" && t.return_date && `Return: ${formatDate(t.return_date)}`}
-              </div>
+              {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
             </div>
-            {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+            <div className="text-xs mt-1" style={{ color: COLORS.text }}>
+              {[t.year, t.make, t.model].filter(Boolean).join(" ")}
+              {t.vin && <span style={{ color: COLORS.muted }}> · VIN {t.vin}</span>}
+            </div>
+            <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
+              {t.assigned_driver && `Driver: ${t.assigned_driver} \u00b7 `}
+              {t.ownership === "Short-Term Rental" && t.rented_from && `From: ${t.rented_from} \u00b7 `}
+              {t.ownership === "Short-Term Rental" && t.return_date && `Return: ${formatDate(t.return_date)}`}
+            </div>
+            {expandedId === t.id && (
+              <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+                <DocumentsSection
+                  documents={docs.documents}
+                  category="Trailer"
+                  linkedTo={t.trailer_number}
+                  docTypes={["Registration", "Annual Inspection", "Other"]}
+                  uploadDocument={docs.uploadDocument}
+                  deleteDocument={docs.deleteDocument}
+                  viewDocument={docs.viewDocument}
+                  currentUser={currentUser}
+                  canEdit={canEdit}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

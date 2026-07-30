@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { Paperclip } from "lucide-react";
+import { useDocuments } from "./useDocuments";
 
 export const COLORS = {
   bg: "#0B1119",
@@ -252,5 +254,109 @@ export function driverBoardStatusColor(s) {
   if (s === "Ready") return COLORS.green;
   if (s === "In Route") return COLORS.amber;
   return COLORS.muted;
+}
+
+// Small paperclip badge shown before a status pill when at least one document is
+// attached for this category+linkedTo. Import { useDocuments } wherever this is used
+// and pass its `documents` array in, so multiple rows on one page share one fetch.
+export function HasDocsBadge({ documents, category, linkedTo }) {
+  const hasDocs = (documents || []).some((d) => d.category === category && d.linked_to === linkedTo);
+  if (!hasDocs) return null;
+  return (
+    <span title="Documents attached" className="flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: COLORS.surfaceAlt, border: `1px solid ${COLORS.amber}`, color: COLORS.amber, flexShrink: 0 }}>
+      <Paperclip size={10} />
+    </span>
+  );
+}
+
+// Full upload + list section for a given category/linkedTo (e.g. category="Driver",
+// linkedTo="J. Alvarez"). Reused across Fleet, Dispatch, and Accounting.
+export function DocumentsSection({ documents, category, linkedTo, docTypes, uploadDocument, deleteDocument, viewDocument, currentUser, canEdit, canDelete }) {
+  const [showUpload, setShowUpload] = useState(false);
+  const [docType, setDocType] = useState(docTypes[0]);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState("");
+
+  const myDocs = (documents || []).filter((d) => d.category === category && d.linked_to === linkedTo);
+  const allowDelete = canDelete !== undefined ? canDelete : canEdit;
+
+  async function upload() {
+    if (!file) { setLocalError("Choose a photo or PDF first."); return; }
+    setLocalError("");
+    setBusy(true);
+    const ok = await uploadDocument({ category, linkedTo, docType, issueDate: todayISO(), expiryDate, createdBy: currentUser }, file);
+    setBusy(false);
+    if (ok) {
+      setFile(null);
+      setExpiryDate("");
+      setShowUpload(false);
+    } else {
+      setLocalError("Upload failed \u2014 check the file size (max 15MB) and try again.");
+    }
+  }
+
+  async function handleView(doc) {
+    const url = await viewDocument(doc);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else setLocalError("Could not open this file.");
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: COLORS.muted }}>
+          Documents <span style={{ color: COLORS.muted }}>({myDocs.length})</span>
+        </span>
+        {canEdit && (
+          <button onClick={() => setShowUpload(!showUpload)} className="text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>
+            + Upload
+          </button>
+        )}
+      </div>
+
+      {showUpload && canEdit && (
+        <div className="p-2 mb-2 rounded" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.line}` }}>
+          {localError && <p className="text-[10px] mb-1" style={{ color: COLORS.red }}>{localError}</p>}
+          <div className="flex flex-wrap gap-2 items-end">
+            <Field label="Type">
+              <select style={{ ...inputStyle, fontSize: 11, padding: "4px 6px" }} value={docType} onChange={(e) => setDocType(e.target.value)}>
+                {docTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Expiry Date (optional)">
+              <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px" }} type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+            </Field>
+            <Field label="File">
+              <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px" }} type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </Field>
+            <button onClick={upload} disabled={busy} className="px-2 py-1.5 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F", opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Uploading\u2026" : "Save"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {myDocs.length === 0 ? (
+        <div className="text-[11px]" style={{ color: COLORS.muted }}>No documents attached yet.</div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {myDocs.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between text-[11px] flex-wrap gap-1" style={{ color: COLORS.text }}>
+              <span>
+                {doc.doc_type}{doc.file_name ? ` \u2014 ${doc.file_name}` : ""}
+                {doc.expiry_date && <Pill color={docColor(daysUntil(doc.expiry_date))}> {docLabel(daysUntil(doc.expiry_date))}</Pill>}
+              </span>
+              <span className="flex items-center gap-2">
+                <button onClick={() => handleView(doc)} className="font-bold uppercase" style={{ color: COLORS.amber }}>View</button>
+                {allowDelete && <button onClick={() => deleteDocument(doc)} style={{ color: COLORS.muted }}>Remove</button>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 

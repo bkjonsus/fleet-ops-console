@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 export const COLORS = {
   bg: "#0F1620",
@@ -136,3 +136,91 @@ export function ErrorBanner({ message }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 additions: multi-stop loads, TONU, Driver Board, compact layout
+// ---------------------------------------------------------------------------
+
+// A load's stops as an array. Falls back to a synthesized 2-stop (pickup/drop)
+// array from the older single-leg columns for any load created before
+// multi-stop support existed, so old data keeps working with no migration.
+export function getStops(load) {
+  if (load.stops && load.stops.length) return load.stops;
+  return [
+    { id: "legacy-0", location: load.origin || "", date: load.pickup_date || "", time: load.pickup_time || "" },
+    { id: "legacy-1", location: load.destination || "", date: load.delivery_date || "", time: load.delivery_time || "" },
+  ];
+}
+
+// Trims a trailing street address / ZIP down to "City, State" for compact display.
+export function shortLocation(loc) {
+  if (!loc) return loc;
+  let s = loc.trim();
+  s = s.replace(/\s+\d{5}(-\d{4})?$/, "");
+  const commaIdx = s.lastIndexOf(",");
+  if (commaIdx === -1) return s;
+  let cityPart = s.slice(0, commaIdx).trim();
+  const statePart = s.slice(commaIdx + 1).trim();
+  if (/^\d/.test(cityPart)) {
+    const words = cityPart.split(/\s+/);
+    cityPart = words[words.length - 1];
+  }
+  return `${cityPart}, ${statePart}`;
+}
+
+// e.g. "WED JUL 29, 9:34 AM"
+export function formatDateTimeCompact(dateStr, timeStr) {
+  if (!dateStr) return "\u2014";
+  const d = new Date(dateStr + "T00:00:00");
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+  const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const day = d.getDate();
+  const base = `${weekday} ${month} ${day}`;
+  return timeStr ? `${base}, ${formatTime(timeStr)}` : base;
+}
+
+export function ratePerMile(rate, miles) {
+  const r = Number(rate), m = Number(miles);
+  if (!r || !m) return null;
+  return `$${(r / m).toFixed(2)}/mi`;
+}
+
+// 6-character alphanumeric code (no 0/O/1/I, to avoid mix-ups) for load/invoice numbers.
+export function generateCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 640px)").matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
+export function StopCircle({ n }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-full font-bold"
+      style={{ width: 15, height: 15, fontSize: 9, background: COLORS.surfaceAlt, color: COLORS.amber, border: `1px solid ${COLORS.amber}`, flexShrink: 0 }}
+    >
+      {n}
+    </span>
+  );
+}
+
+export const DRIVER_BOARD_STATUSES = ["Ready", "In Route", "Off", "Sleeper", "Home"];
+export function driverBoardStatusColor(s) {
+  if (s === "Ready") return COLORS.green;
+  if (s === "In Route") return COLORS.amber;
+  return COLORS.muted;
+}
+

@@ -33,7 +33,7 @@ serve(async (req) => {
 
     const { data: callerProfile, error: profileErr } = await callerClient
       .from("profiles")
-      .select("role")
+      .select("role, company_id, is_super_admin")
       .eq("id", user.id)
       .single();
 
@@ -42,13 +42,24 @@ serve(async (req) => {
     }
 
     // 2. Read the new account's details from the request.
-    const { email, password, full_name, role } = await req.json();
-    const validRoles = ["admin", "dispatch", "fleet", "accounting", "ops_viewer"];
+    const { email, password, full_name, role, company_id } = await req.json();
+    const validRoles = ["admin", "dispatch", "fleet", "accounting", "ops_viewer", "driver"];
     if (!email || !password || !role || !validRoles.includes(role)) {
       return new Response(JSON.stringify({ error: "email, password, and a valid role are required." }), { status: 400, headers: corsHeaders });
     }
     if (password.length < 8) {
       return new Response(JSON.stringify({ error: "Password must be at least 8 characters." }), { status: 400, headers: corsHeaders });
+    }
+
+    // A regular admin can only create accounts within their own company, regardless of what
+    // was sent \u2014 only a super admin (managing multiple client companies) can target a
+    // different company_id than their own.
+    const finalCompanyId = callerProfile.is_super_admin
+      ? (company_id || callerProfile.company_id)
+      : callerProfile.company_id;
+
+    if (!finalCompanyId) {
+      return new Response(JSON.stringify({ error: "No company selected \u2014 pick a company first." }), { status: 400, headers: corsHeaders });
     }
 
     // 3. Use the privileged admin client (service role key) to actually create the login.
@@ -64,10 +75,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: createErr.message }), { status: 400, headers: corsHeaders });
     }
 
-    // 4. The database trigger auto-creates a profile row with role='dispatch' \u2014 set it to what the admin chose.
+    // 4. The database trigger auto-creates a profile row with role='dispatch' \u2014 set it to
+    // what the admin chose, and stamp it with the right company.
     const { error: roleErr } = await adminClient
       .from("profiles")
-      .update({ role, full_name: full_name || email })
+      .update({ role, full_name: full_name || email, company_id: finalCompanyId })
       .eq("id", created.user.id);
 
     if (roleErr) {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { useAuth } from "../AuthContext";
-import { COLORS, inputStyle, Field, Panel, EmptyState, ErrorBanner } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner } from "../ui";
 
 const ROLES = ["admin", "dispatch", "fleet", "accounting", "ops_viewer", "driver"];
 const ROLE_LABELS = {
@@ -41,7 +41,7 @@ export default function TeamPage() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("profiles").select("*").order("created_at");
+    const { data, error } = await supabase.from("profiles").select("*, companies(name)").order("created_at");
     if (error) setError(error.message);
     else setProfiles(data || []);
     setLoading(false);
@@ -145,7 +145,10 @@ export default function TeamPage() {
           <div key={p.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
             <div>
               <div className="text-sm font-bold" style={{ color: COLORS.text }}>{p.full_name}</div>
-              <div className="text-xs" style={{ color: COLORS.muted }}>{ROLE_LABELS[p.role] || p.role}</div>
+              <div className="text-xs flex items-center gap-2 mt-0.5" style={{ color: COLORS.muted }}>
+                <span>{ROLE_LABELS[p.role] || p.role}</span>
+                {p.companies?.name && <Pill color={COLORS.amber}>{p.companies.name}</Pill>}
+              </div>
             </div>
             <select value={p.role} onChange={(e) => changeRole(p.id, e.target.value)} style={{ ...inputStyle, fontSize: 12 }}>
               {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}

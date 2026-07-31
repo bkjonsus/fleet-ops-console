@@ -7,6 +7,7 @@ import DispatchPage from "./pages/DispatchPage";
 import FleetPage from "./pages/FleetPage";
 import AccountingPage from "./pages/AccountingPage";
 import TeamPage from "./pages/TeamPage";
+import DriverAppPage from "./pages/DriverAppPage";
 
 // Which roles can EDIT each section (everyone whose role grants at least view access can see it;
 // this list controls whether Save/Delete/Status buttons are shown).
@@ -22,7 +23,7 @@ function Shell() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.bg, color: COLORS.muted }}>
-        <Loader2 className="animate-spin mr-2" size={20} /> Loading\u2026
+        <Loader2 className="animate-spin mr-2" size={20} /> Loading…
       </div>
     );
   }
@@ -36,6 +37,16 @@ function Shell() {
           <p className="mb-3">Your account doesn't have a role assigned yet.</p>
           <p className="text-xs mb-4">Ask your admin to set your role in the Team page.</p>
           <button onClick={signOut} className="text-xs underline">Sign out</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (role === "driver") {
+    return (
+      <div className="min-h-screen w-full overflow-x-hidden" style={{ background: COLORS.bg, fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif" }}>
+        <div className="p-4">
+          <DriverAppPage />
         </div>
       </div>
     );

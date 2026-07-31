@@ -3,13 +3,14 @@ import { Plus } from "lucide-react";
 import { supabase } from "../supabaseClient";
 import { COLORS, inputStyle, Field, Panel, EmptyState, ErrorBanner } from "../ui";
 
-const ROLES = ["admin", "dispatch", "fleet", "accounting", "ops_viewer"];
+const ROLES = ["admin", "dispatch", "fleet", "accounting", "ops_viewer", "driver"];
 const ROLE_LABELS = {
   admin: "Admin (full access)",
   dispatch: "Dispatch (loads only)",
   fleet: "Fleet Manager (drivers/trucks/trailers)",
   accounting: "Accounting (invoices/expenses/statements)",
   ops_viewer: "Ops Viewer (sees all, edits ops only)",
+  driver: "Driver (their own loads only)",
 };
 
 function randomPassword() {
@@ -99,6 +100,12 @@ export default function TeamPage() {
         <Panel title="Create Staff Account" onClose={() => setShowForm(false)}>
           <div className="grid grid-cols-1 gap-3">
             <Field label="Full Name"><input style={inputStyle} value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} placeholder="Maria Alvarez" /></Field>
+            {form.role === "driver" && (
+              <p className="text-[11px] -mt-1" style={{ color: COLORS.amber }}>
+                For "Driver" accounts, this name must exactly match their entry in Fleet → Drivers,
+                so the app can link their login to their driver record and loads.
+              </p>
+            )}
             <Field label="Email"><input style={inputStyle} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="maria@yourcompany.com" /></Field>
             <Field label="Temporary Password">
               <div className="flex gap-2">

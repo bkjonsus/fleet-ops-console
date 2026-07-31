@@ -24,7 +24,7 @@ function randomPassword() {
 }
 
 export default function TeamPage() {
-  const { activeCompanyId } = useAuth();
+  const { activeCompanyId, user } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -37,11 +37,13 @@ export default function TeamPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [activeCompanyId]);
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("profiles").select("*, companies(name)").order("created_at");
+    let query = supabase.from("profiles").select("*, companies(name)").order("created_at");
+    if (activeCompanyId) query = query.eq("company_id", activeCompanyId);
+    const { data, error } = await query;
     if (error) setError(error.message);
     else setProfiles(data || []);
     setLoading(false);
@@ -141,20 +143,29 @@ export default function TeamPage() {
       {!loading && profiles.length === 0 && <EmptyState text="No staff accounts yet." />}
 
       <div className="flex flex-col gap-2">
-        {profiles.map((p) => (
-          <div key={p.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
-            <div>
-              <div className="text-sm font-bold" style={{ color: COLORS.text }}>{p.full_name}</div>
-              <div className="text-xs flex items-center gap-2 mt-0.5" style={{ color: COLORS.muted }}>
-                <span>{ROLE_LABELS[p.role] || p.role}</span>
-                {p.companies?.name && <Pill color={COLORS.amber}>{p.companies.name}</Pill>}
+        {profiles.map((p) => {
+          const isSelf = p.id === user?.id;
+          return (
+            <div key={p.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+              <div>
+                <div className="text-sm font-bold" style={{ color: COLORS.text }}>{p.full_name}{isSelf && <span style={{ color: COLORS.muted, fontWeight: 400 }}> (you)</span>}</div>
+                <div className="text-xs flex items-center gap-2 mt-0.5" style={{ color: COLORS.muted }}>
+                  <span>{ROLE_LABELS[p.role] || p.role}</span>
+                  {p.companies?.name && <Pill color={COLORS.amber}>{p.companies.name}</Pill>}
+                </div>
               </div>
+              {isSelf ? (
+                <span className="text-[11px]" style={{ color: COLORS.muted }} title="Ask another admin to change your role, so you can't accidentally lock yourself out.">
+                  Can't change your own role
+                </span>
+              ) : (
+                <select value={p.role} onChange={(e) => changeRole(p.id, e.target.value)} style={{ ...inputStyle, fontSize: 12 }}>
+                  {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              )}
             </div>
-            <select value={p.role} onChange={(e) => changeRole(p.id, e.target.value)} style={{ ...inputStyle, fontSize: 12 }}>
-              {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-            </select>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

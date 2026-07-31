@@ -118,7 +118,7 @@ function AvailabilityCard({ driver, updateDriver }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           onBlur={() => updateDriver(driver.id, { board_note: note })}
-          placeholder="e.g. Want to head toward FL next, home by Sunday\u2026"
+          placeholder="e.g. Want to head toward FL next, home by Sunday…"
         />
       </Field>
     </div>

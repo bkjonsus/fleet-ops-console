@@ -4,12 +4,15 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { useTable } from "./useTable";
 import { COLORS, inputStyle, Field } from "./ui";
 import Login from "./pages/Login";
+import LandingPage from "./pages/LandingPage";
+import ApplyPage from "./pages/ApplyPage";
 import DispatchPage from "./pages/DispatchPage";
 import FleetPage from "./pages/FleetPage";
 import AccountingPage from "./pages/AccountingPage";
 import TeamPage from "./pages/TeamPage";
 import DriverAppPage from "./pages/DriverAppPage";
 import CompaniesPage from "./pages/CompaniesPage";
+import HRPage from "./pages/HRPage";
 
 // Which roles can EDIT each section (everyone whose role grants at least view access can see it;
 // this list controls whether Save/Delete/Status buttons are shown).
@@ -21,18 +24,21 @@ const CAN_VIEW_MONEY = ["admin", "accounting", "ops_viewer"];
 function Shell() {
   const { user, profile, role, loading, signOut, isSuperAdmin, activeCompanyId, setActiveCompanyId, companies } = useAuth();
   const [tab, setTab] = useState("dispatch");
+  const [showLogin, setShowLogin] = useState(false);
   const [previewDriverName, setPreviewDriverName] = useState(null);
   const { rows: allDrivers } = useTable("drivers", "name", true, activeCompanyId);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.bg, color: COLORS.muted }}>
-        <Loader2 className="animate-spin mr-2" size={20} /> Loading\u2026
+        <Loader2 className="animate-spin mr-2" size={20} /> Loading…
       </div>
     );
   }
 
-  if (!user) return <Login />;
+  if (!user) {
+    return showLogin ? <Login onBack={() => setShowLogin(false)} /> : <LandingPage onSignIn={() => setShowLogin(true)} />;
+  }
 
   if (!role) {
     return (
@@ -63,6 +69,7 @@ function Shell() {
     { key: "team", label: "Team", icon: Users, visible: role === "admin" },
     { key: "driverapp", label: "Driver App", icon: Truck, visible: role === "admin" },
     { key: "companies", label: "Companies", icon: Building2, visible: isSuperAdmin },
+    { key: "hr", label: "HR", icon: Users, visible: role === "admin" || role === "fleet" },
   ].filter((t) => t.visible);
 
   // If the active tab isn't visible for this role (e.g. after a role change), fall back to the first visible tab.
@@ -74,14 +81,14 @@ function Shell() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Truck size={22} color={COLORS.amber} />
-            <h1 className="text-xl font-black uppercase tracking-wide" style={{ color: COLORS.text, letterSpacing: "0.03em" }}>Fleet Ops Console</h1>
+            <h1 className="text-xl font-black uppercase tracking-wide" style={{ color: COLORS.text, letterSpacing: "0.03em" }}>BK TMS</h1>
           </div>
           <button onClick={signOut} className="flex items-center gap-1 text-xs font-bold uppercase" style={{ color: COLORS.muted }}>
             <LogOut size={13} /> Sign Out
           </button>
         </div>
         <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
-          {profile?.full_name} \u00b7 {role.replace("_", " ")}
+          {profile?.full_name} · {isSuperAdmin ? "Super Admin" : role.replace("_", " ")}
         </p>
 
         {isSuperAdmin && companies.length > 0 && (
@@ -119,6 +126,7 @@ function Shell() {
         {activeTab === "companies" && isSuperAdmin && (
           <CompaniesPage onCompanyCreated={(c) => setActiveCompanyId(c.id)} />
         )}
+        {activeTab === "hr" && (role === "admin" || role === "fleet") && <HRPage />}
         {activeTab === "driverapp" && role === "admin" && (
           previewDriverName ? (
             <DriverAppPage previewAsName={previewDriverName} isPreview onExitPreview={() => setPreviewDriverName(null)} />
@@ -126,11 +134,11 @@ function Shell() {
             <div className="max-w-sm">
               <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: COLORS.text }}>Preview as Driver</h2>
               <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
-                Pick a driver to see exactly what they see when they log in \u2014 their loads, status buttons, and document upload.
+                Pick a driver to see exactly what they see when they log in — their loads, status buttons, and document upload.
               </p>
               <Field label="Driver">
                 <select style={inputStyle} value="" onChange={(e) => setPreviewDriverName(e.target.value)}>
-                  <option value="" disabled>Choose a driver\u2026</option>
+                  <option value="" disabled>Choose a driver…</option>
                   {allDrivers.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                 </select>
               </Field>
@@ -143,6 +151,11 @@ function Shell() {
 }
 
 export default function App() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("apply") === "1") {
+    return <ApplyPage companyId={params.get("company")} />;
+  }
+
   return (
     <AuthProvider>
       <Shell />

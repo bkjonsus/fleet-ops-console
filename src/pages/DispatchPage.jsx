@@ -692,7 +692,7 @@ function TonuPanel({ load, update, canEdit }) {
               rows={2}
               value={disputeNote}
               onChange={(e) => setDisputeNote(e.target.value)}
-              placeholder="e.g. Broker claims driver never confirmed dispatch \u2014 pushing back with dispatch log timestamps."
+              placeholder="e.g. Broker claims driver never confirmed dispatch — pushing back with dispatch log timestamps."
             />
           </Field>
           <div className="flex gap-2 mt-2">
@@ -732,7 +732,7 @@ function DispatchNoteField({ driver, updateDriver }) {
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => { if (value !== (driver.dispatch_note || "")) updateDriver(driver.id, { dispatch_note: value }); }}
-      placeholder="Reply or send a message to this driver\u2026"
+      placeholder="Reply or send a message to this driver…"
     />
   );
 }

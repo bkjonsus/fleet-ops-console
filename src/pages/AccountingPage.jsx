@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid, sanitizeForInsert, generateCode, getStops, shortLocation, StopCircle, formatDateTimeCompact, ratePerMile, docColor, docLabel, daysUntil } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid, sanitizeForInsert, generateCode, getStops, shortLocation, StopCircle, formatDateTimeCompact, ratePerMile, docColor, docLabel, daysUntil, DocumentsSection } from "../ui";
 
 const INVOICE_STATUSES = ["Draft", "Sent", "Paid", "Overdue"];
 const EXPENSE_CATEGORIES = ["Fuel", "Maintenance", "Insurance", "Payroll", "Tolls/Permits", "Other"];
@@ -23,6 +23,7 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
   const statementsTable = useTable("statements");
   const { rows: loads, update: updateLoad } = useTable("loads");
   const { rows: drivers } = useTable("drivers", "name", true);
+  const loadDocs = useDocuments();
   const { profile } = useAuth();
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
   const [viewingStatementId, setViewingStatementId] = useState(null);
@@ -114,7 +115,7 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
       )}
 
       {subTab === "load board" && (
-        <LoadBoardPanel loads={loads} invoices={invoicesTable.rows} insertInvoice={invoicesTable.insert} updateLoad={updateLoad} currentUser={currentUserLabel} canEdit={canEdit} />
+        <LoadBoardPanel loads={loads} invoices={invoicesTable.rows} insertInvoice={invoicesTable.insert} updateLoad={updateLoad} currentUser={currentUserLabel} canEdit={canEdit} docs={loadDocs} />
       )}
       {subTab === "invoices" && (
         <InvoicesPanel table={invoicesTable} loads={loads} currentUser={currentUserLabel} setViewingInvoiceId={setViewingInvoiceId} canEdit={canEdit} />
@@ -268,7 +269,7 @@ function StatCard({ label, value, color }) {
 // Load Board
 // ---------------------------------------------------------------------------
 
-function LoadBoardPanel({ loads, invoices, insertInvoice, updateLoad, currentUser, canEdit }) {
+function LoadBoardPanel({ loads, invoices, insertInvoice, updateLoad, currentUser, canEdit, docs }) {
   const [quickInvoiceFor, setQuickInvoiceFor] = useState(null);
   const [qForm, setQForm] = useState(null);
   const [filterStatus, setFilterStatus] = useState("All");
@@ -428,6 +429,21 @@ function LoadBoardPanel({ loads, invoices, insertInvoice, updateLoad, currentUse
                     {(l.miles === 0 || l.miles) && <span>Miles: {l.miles}</span>}
                     {l.broker && <span>Broker: {l.broker}</span>}
                     {l.notes && <span>Notes: {l.notes}</span>}
+                  </div>
+
+                  <div className="mb-2">
+                    <DocumentsSection
+                      documents={docs.documents}
+                      category="Load"
+                      linkedTo={l.load_number}
+                      docTypes={["Rate Confirmation", "Bill of Lading (BOL)", "Proof of Delivery (POD)", "Lumper Receipt", "Scale Ticket", "Other"]}
+                      uploadDocument={docs.uploadDocument}
+                      deleteDocument={() => {}}
+                      viewDocument={docs.viewDocument}
+                      currentUser={currentUser}
+                      canEdit={false}
+                      canDelete={false}
+                    />
                   </div>
 
                   {matches.length > 0 && (

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Truck, FileText, Users, LogOut, Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
-import { COLORS } from "./ui";
+import { useTable } from "./useTable";
+import { COLORS, inputStyle, Field } from "./ui";
 import Login from "./pages/Login";
 import DispatchPage from "./pages/DispatchPage";
 import FleetPage from "./pages/FleetPage";
@@ -19,6 +20,8 @@ const CAN_VIEW_MONEY = ["admin", "accounting", "ops_viewer"];
 function Shell() {
   const { user, profile, role, loading, signOut } = useAuth();
   const [tab, setTab] = useState("dispatch");
+  const [previewDriverName, setPreviewDriverName] = useState(null);
+  const { rows: allDrivers } = useTable("drivers", "name", true);
 
   if (loading) {
     return (
@@ -57,6 +60,7 @@ function Shell() {
     { key: "fleet", label: "Fleet", icon: Users, visible: role !== "dispatch" && role !== "accounting" },
     { key: "accounting", label: "Accounting", icon: FileText, visible: CAN_VIEW_MONEY.includes(role) },
     { key: "team", label: "Team", icon: Users, visible: role === "admin" },
+    { key: "driverapp", label: "Driver App", icon: Truck, visible: role === "admin" },
   ].filter((t) => t.visible);
 
   // If the active tab isn't visible for this role (e.g. after a role change), fall back to the first visible tab.
@@ -97,6 +101,24 @@ function Shell() {
         {activeTab === "fleet" && <FleetPage canEdit={CAN_EDIT_FLEET.includes(role)} />}
         {activeTab === "accounting" && <AccountingPage canEdit={CAN_EDIT_MONEY.includes(role)} canViewMoney={CAN_VIEW_MONEY.includes(role)} />}
         {activeTab === "team" && role === "admin" && <TeamPage />}
+        {activeTab === "driverapp" && role === "admin" && (
+          previewDriverName ? (
+            <DriverAppPage previewAsName={previewDriverName} isPreview onExitPreview={() => setPreviewDriverName(null)} />
+          ) : (
+            <div className="max-w-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: COLORS.text }}>Preview as Driver</h2>
+              <p className="text-xs mb-3" style={{ color: COLORS.muted }}>
+                Pick a driver to see exactly what they see when they log in \u2014 their loads, status buttons, and document upload.
+              </p>
+              <Field label="Driver">
+                <select style={inputStyle} value="" onChange={(e) => setPreviewDriverName(e.target.value)}>
+                  <option value="" disabled>Choose a driver\u2026</option>
+                  {allDrivers.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                </select>
+              </Field>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

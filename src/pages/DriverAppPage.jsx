@@ -11,9 +11,9 @@ import {
 
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
 
-export default function DriverAppPage() {
+export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
   const { profile, signOut } = useAuth();
-  const myName = profile?.full_name;
+  const myName = previewAsName || profile?.full_name;
   const { rows: allLoads, update: updateLoad } = useTable("loads");
   const { rows: allDrivers, update: updateDriver } = useTable("drivers", "name", true);
   const docs = useDocuments();
@@ -24,19 +24,27 @@ export default function DriverAppPage() {
 
   return (
     <div>
+      {isPreview && (
+        <div className="mb-3 px-3 py-2 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: "#2A2110", border: `1px solid ${COLORS.amber}` }}>
+          <span className="text-xs font-bold" style={{ color: COLORS.amber }}>Previewing as: {myName}</span>
+          <button onClick={onExitPreview} className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Exit Preview</button>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-lg font-black uppercase tracking-wide" style={{ color: COLORS.text }}>My Loads</h1>
           <p className="text-xs" style={{ color: COLORS.muted }}>Welcome, {myName}</p>
         </div>
-        <button onClick={signOut} className="flex items-center gap-1 text-xs font-bold uppercase" style={{ color: COLORS.muted }}>
-          <LogOut size={13} /> Sign Out
-        </button>
+        {!isPreview && (
+          <button onClick={signOut} className="flex items-center gap-1 text-xs font-bold uppercase" style={{ color: COLORS.muted }}>
+            <LogOut size={13} /> Sign Out
+          </button>
+        )}
       </div>
 
       {!myDriverRecord && (
         <div className="p-3 mb-4 rounded text-xs" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}`, color: COLORS.red }}>
-          Your account name ("{myName}") doesn't match any driver in the Fleet roster \u2014 loads won't show up
+          Your account name ("{myName}") doesn't match any driver in the Fleet roster — loads won't show up
           until an admin fixes this (Fleet → Drivers, or update your Team account name to match exactly).
         </div>
       )}

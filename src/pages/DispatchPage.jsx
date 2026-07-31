@@ -2,12 +2,14 @@ import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon } from "lucide-react";
 import { useTable } from "../useTable";
+import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime,
   todayISO, sanitizeForInsert, TONU_STATUSES, tonuStatusColor, getStops, shortLocation,
   formatDateTimeCompact, ratePerMile, generateCode, useIsMobile, StopCircle,
   DRIVER_BOARD_STATUSES, driverBoardStatusColor, uid, canEditLoadInfo, IN_TRANSIT_STATUSES, HISTORY_STATUSES,
+  DocumentsSection, HasDocsBadge,
 } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled", "TONU"];
@@ -74,6 +76,7 @@ export default function DispatchPage({ canEdit, role }) {
   const { rows: drivers } = useTable("drivers", "name", true);
   const { rows: trucks } = useTable("trucks", "unit_number", true);
   const { rows: invoices } = useTable("invoices");
+  const docs = useDocuments();
   const { profile } = useAuth();
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
 
@@ -321,7 +324,7 @@ export default function DispatchPage({ canEdit, role }) {
 
           <div className="flex flex-col gap-1">
             {filteredLoads.map((l) => (
-              <LoadRow key={l.id} load={l} drivers={drivers} trucks={trucks} invoices={invoices} isHistory={dispatchView === "history"} role={role} update={update} remove={remove} canEdit={canEdit} />
+              <LoadRow key={l.id} load={l} drivers={drivers} trucks={trucks} invoices={invoices} isHistory={dispatchView === "history"} role={role} update={update} remove={remove} canEdit={canEdit} docs={docs} currentUser={currentUserLabel} />
             ))}
           </div>
         </>
@@ -361,7 +364,7 @@ function AssignedBadge({ load: l, drivers, update, canEditInfo }) {
   );
 }
 
-function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, remove, canEdit }) {
+function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, remove, canEdit, docs, currentUser }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(null);
@@ -437,6 +440,7 @@ function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, 
               <span className="font-mono text-xs font-bold" style={{ color: COLORS.amber }}>{l.load_number}</span>
             </div>
             <div className="flex items-center gap-2">
+              <HasDocsBadge documents={docs.documents} category="Load" linkedTo={l.load_number} />
               <AssignedBadge load={l} drivers={drivers} update={update} canEditInfo={canEditInfo} />
               {isHistory && <Pill color={paymentColor(paymentStatus)}>{paymentStatus}</Pill>}
               {canEditInfo && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
@@ -491,6 +495,7 @@ function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, 
                 {ratePerMile(l.rate, l.miles) && <span className="text-[9px] whitespace-nowrap" style={{ color: COLORS.muted }}>{ratePerMile(l.rate, l.miles)}</span>}
               </span>
             )}
+            <HasDocsBadge documents={docs.documents} category="Load" linkedTo={l.load_number} />
             <AssignedBadge load={l} drivers={drivers} update={update} canEditInfo={canEditInfo} />
             {isHistory && <Pill color={paymentColor(paymentStatus)}>{paymentStatus}</Pill>}
             {canEditInfo && <button onClick={startEdit} style={{ color: COLORS.muted }} className="hover:opacity-70"><Pencil size={12} /></button>}
@@ -530,6 +535,18 @@ function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, 
                   {LOAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               )}
+
+              <DocumentsSection
+                documents={docs.documents}
+                category="Load"
+                linkedTo={l.load_number}
+                docTypes={["Rate Confirmation", "Bill of Lading (BOL)", "Proof of Delivery (POD)", "Lumper Receipt", "Scale Ticket", "Other"]}
+                uploadDocument={docs.uploadDocument}
+                deleteDocument={docs.deleteDocument}
+                viewDocument={docs.viewDocument}
+                currentUser={currentUser}
+                canEdit={canEdit}
+              />
 
               {l.status === "TONU" && <TonuPanel load={l} update={update} canEdit={canEdit} />}
 

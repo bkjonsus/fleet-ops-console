@@ -3,8 +3,9 @@ import * as XLSX from "xlsx";
 import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTable } from "../useTable";
+import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid, sanitizeForInsert, generateCode, getStops, shortLocation, StopCircle, formatDateTimeCompact, ratePerMile } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, uid, sanitizeForInsert, generateCode, getStops, shortLocation, StopCircle, formatDateTimeCompact, ratePerMile, docColor, docLabel, daysUntil } from "../ui";
 
 const INVOICE_STATUSES = ["Draft", "Sent", "Paid", "Overdue"];
 const EXPENSE_CATEGORIES = ["Fuel", "Maintenance", "Insurance", "Payroll", "Tolls/Permits", "Other"];
@@ -65,7 +66,7 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
   return (
     <div>
       <div className="flex flex-wrap gap-1 mb-4">
-        {["overview", "load board", "invoices", "expenses", "statements"].map((k) => (
+        {["overview", "load board", "invoices", "expenses", "statements", "documents"].map((k) => (
           <button
             key={k}
             onClick={() => setSubTab(k)}
@@ -123,6 +124,132 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
       )}
       {subTab === "statements" && (
         <StatementsPanel table={statementsTable} loads={loads} drivers={drivers} canEdit={canEdit} setViewingStatementId={setViewingStatementId} />
+      )}
+      {subTab === "documents" && (
+        <AccountingDocumentsPanel canEdit={canEdit} />
+      )}
+    </div>
+  );
+}
+
+function AccountingDocumentsPanel({ canEdit }) {
+  const docs = useDocuments();
+  const { profile } = useAuth();
+  const currentUser = profile?.full_name || profile?.role || "Unknown";
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [showUpload, setShowUpload] = useState(false);
+  const [category, setCategory] = useState("Accounting");
+  const [docType, setDocType] = useState("Tax Filing");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [localError, setLocalError] = useState("");
+
+  const ACCOUNTING_DOC_CATEGORIES = ["Accounting", "Company"];
+  const DOC_TYPES = {
+    Accounting: ["Tax Filing", "Bank Statement", "Payroll Report", "Audit Document", "Insurance Policy", "Other"],
+    Company: ["Operating Authority (MC#)", "IFTA License", "IRP Cab Card", "General Liability Insurance", "Business License", "Other"],
+  };
+
+  const acctDocs = (docs.documents || []).filter((d) => ACCOUNTING_DOC_CATEGORIES.includes(d.category));
+  const filtered = filterCategory === "All" ? acctDocs : acctDocs.filter((d) => d.category === filterCategory);
+
+  async function upload() {
+    if (!file) { setLocalError("Choose a photo or PDF first."); return; }
+    setLocalError("");
+    setBusy(true);
+    const ok = await docs.uploadDocument({ category, linkedTo: "", docType, issueDate: todayISO(), expiryDate, createdBy: currentUser }, file);
+    setBusy(false);
+    if (ok) { setFile(null); setExpiryDate(""); setShowUpload(false); } else { setLocalError("Upload failed \u2014 try a smaller file."); }
+  }
+
+  async function handleView(doc) {
+    const url = await docs.viewDocument(doc);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>
+          Documents <span style={{ color: COLORS.muted }}>({acctDocs.length})</span>
+        </h2>
+        {canEdit && (
+          <button onClick={() => setShowUpload(!showUpload)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ background: COLORS.amber, color: COLORS.bg }}>
+            <Plus size={14} /> Upload
+          </button>
+        )}
+      </div>
+      <p className="text-[11px] mb-3" style={{ color: COLORS.muted }}>
+        Accounting and Company documents — tax filings, bank statements, insurance policies, and the
+        like, with expiry tracking. Load documents live on the load itself in Dispatch.
+      </p>
+
+      {showUpload && canEdit && (
+        <div className="p-2 mb-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+          {localError && <p className="text-[10px] mb-1" style={{ color: COLORS.red }}>{localError}</p>}
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <Field label="Category">
+              <select style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} value={category} onChange={(e) => { setCategory(e.target.value); setDocType(DOC_TYPES[e.target.value][0]); }}>
+                {ACCOUNTING_DOC_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Type">
+              <select style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} value={docType} onChange={(e) => setDocType(e.target.value)}>
+                {DOC_TYPES[category].map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Expiry Date (optional)">
+              <input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+            </Field>
+            <Field label="File">
+              <input style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }} type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            </Field>
+          </div>
+          <button onClick={upload} disabled={busy} className="px-3 py-1.5 text-[11px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F", opacity: busy ? 0.6 : 1 }}>
+            {busy ? "Uploading\u2026" : "Save"}
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-1 mb-3">
+        {["All", ...ACCOUNTING_DOC_CATEGORIES].map((c) => (
+          <button
+            key={c}
+            onClick={() => setFilterCategory(c)}
+            className="px-2 py-1 text-[11px] font-bold uppercase rounded"
+            style={{
+              background: filterCategory === c ? COLORS.amber : "transparent",
+              color: filterCategory === c ? COLORS.bg : COLORS.muted,
+              border: `1px solid ${filterCategory === c ? COLORS.amber : COLORS.line}`,
+            }}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <EmptyState text="No documents in this category yet." />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {filtered.map((doc) => (
+            <div key={doc.id} className="p-3 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold" style={{ color: COLORS.text }}>{doc.doc_type}</span>
+                  <Pill color={COLORS.muted}>{doc.category}</Pill>
+                  {doc.expiry_date && <Pill color={docColor(daysUntil(doc.expiry_date))}>{docLabel(daysUntil(doc.expiry_date))}</Pill>}
+                </div>
+                <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{doc.file_name}</div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => handleView(doc)} className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>View</button>
+                {canEdit && <button onClick={() => docs.deleteDocument(doc)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

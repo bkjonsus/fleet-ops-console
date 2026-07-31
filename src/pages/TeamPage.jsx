@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { useAuth } from "../AuthContext";
 import { COLORS, inputStyle, Field, Panel, EmptyState, ErrorBanner } from "../ui";
 
 const ROLES = ["admin", "dispatch", "fleet", "accounting", "ops_viewer", "driver"];
@@ -23,6 +24,7 @@ function randomPassword() {
 }
 
 export default function TeamPage() {
+  const { activeCompanyId } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,7 +61,7 @@ export default function TeamPage() {
     }
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("create-user", {
-      body: { email: form.email, password: form.password, full_name: form.full_name, role: form.role },
+      body: { email: form.email, password: form.password, full_name: form.full_name, role: form.role, company_id: activeCompanyId },
     });
     setBusy(false);
     if (error || data?.error) {

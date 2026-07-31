@@ -12,8 +12,8 @@ const TRAILER_TYPES = ["Dry Van", "Reefer", "Flatbed", "Step Deck", "Other"];
 
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
-  const docs = useDocuments();
-  const { profile } = useAuth();
+  const { profile, activeCompanyId } = useAuth();
+  const docs = useDocuments(activeCompanyId);
   const currentUser = profile?.full_name || profile?.role || "Unknown";
   return (
     <div>
@@ -33,15 +33,15 @@ export default function FleetPage({ canEdit }) {
           </button>
         ))}
       </div>
-      {subTab === "drivers" && <DriversPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
-      {subTab === "trucks" && <TrucksPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
-      {subTab === "trailers" && <TrailersPanel canEdit={canEdit} docs={docs} currentUser={currentUser} />}
+      {subTab === "drivers" && <DriversPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}
+      {subTab === "trucks" && <TrucksPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}
+      {subTab === "trailers" && <TrailersPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}
     </div>
   );
 }
 
-function DriversPanel({ canEdit, docs, currentUser }) {
-  const { rows: drivers, error, insert, update, remove } = useTable("drivers", "name", true);
+function DriversPanel({ canEdit, docs, currentUser, companyId }) {
+  const { rows: drivers, error, insert, update, remove } = useTable("drivers", "name", true, companyId);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({
@@ -154,8 +154,8 @@ function DriversPanel({ canEdit, docs, currentUser }) {
   );
 }
 
-function TrucksPanel({ canEdit, docs, currentUser }) {
-  const { rows: trucks, error, insert, remove } = useTable("trucks", "unit_number", true);
+function TrucksPanel({ canEdit, docs, currentUser, companyId }) {
+  const { rows: trucks, error, insert, remove } = useTable("trucks", "unit_number", true, companyId);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({ unit_number: "", year: "", make: "", model: "", vin: "", ownership: TRUCK_OWNERSHIP[0], assigned_driver: "", rented_from: "", rental_start: todayISO(), return_date: "", notes: "" });
@@ -263,8 +263,8 @@ function TrucksPanel({ canEdit, docs, currentUser }) {
   );
 }
 
-function TrailersPanel({ canEdit, docs, currentUser }) {
-  const { rows: trailers, error, insert, remove } = useTable("trailers", "trailer_number", true);
+function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
+  const { rows: trailers, error, insert, remove } = useTable("trailers", "trailer_number", true, companyId);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const blank = () => ({ trailer_number: "", trailer_type: TRAILER_TYPES[0], year: "", make: "", model: "", vin: "", ownership: TRAILER_OWNERSHIP[0], assigned_driver: "", rented_from: "", rental_start: todayISO(), return_date: "", notes: "" });

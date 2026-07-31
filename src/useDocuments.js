@@ -4,8 +4,8 @@ import { supabase } from "./supabaseClient";
 const BUCKET = "documents";
 const MAX_BYTES = 15 * 1024 * 1024; // Storage isn't as tight as the old artifact's 5MB key limit
 
-export function useDocuments() {
-  const { rows: documents, loading, error, insert, remove: removeRow, refresh } = useTable("documents");
+export function useDocuments(companyId) {
+  const { rows: documents, loading, error, insert, remove: removeRow, refresh } = useTable("documents", "created_at", false, companyId);
 
   // Uploads the file to Storage, then inserts the metadata row. Returns true/false.
   async function uploadDocument(meta, file) {

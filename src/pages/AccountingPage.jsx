@@ -18,13 +18,13 @@ const statusColor = (s) => {
 
 export default function AccountingPage({ canEdit, canViewMoney }) {
   const [subTab, setSubTab] = useState("overview");
-  const invoicesTable = useTable("invoices");
-  const expensesTable = useTable("expenses");
-  const statementsTable = useTable("statements");
-  const { rows: loads, update: updateLoad } = useTable("loads");
-  const { rows: drivers } = useTable("drivers", "name", true);
-  const loadDocs = useDocuments();
-  const { profile } = useAuth();
+  const { profile, activeCompanyId } = useAuth();
+  const invoicesTable = useTable("invoices", "created_at", false, activeCompanyId);
+  const expensesTable = useTable("expenses", "created_at", false, activeCompanyId);
+  const statementsTable = useTable("statements", "created_at", false, activeCompanyId);
+  const { rows: loads, update: updateLoad } = useTable("loads", "created_at", false, activeCompanyId);
+  const { rows: drivers } = useTable("drivers", "name", true, activeCompanyId);
+  const loadDocs = useDocuments(activeCompanyId);
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
   const [viewingStatementId, setViewingStatementId] = useState(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState(null);
@@ -134,8 +134,8 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
 }
 
 function AccountingDocumentsPanel({ canEdit }) {
-  const docs = useDocuments();
-  const { profile } = useAuth();
+  const { profile, activeCompanyId } = useAuth();
+  const docs = useDocuments(activeCompanyId);
   const currentUser = profile?.full_name || profile?.role || "Unknown";
   const [filterCategory, setFilterCategory] = useState("All");
   const [showUpload, setShowUpload] = useState(false);

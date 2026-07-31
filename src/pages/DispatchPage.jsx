@@ -72,12 +72,12 @@ function ZipLookupInput({ onResolved }) {
 }
 
 export default function DispatchPage({ canEdit, role }) {
-  const { rows: loads, loading, error, insert, update, remove } = useTable("loads");
-  const { rows: drivers } = useTable("drivers", "name", true);
-  const { rows: trucks } = useTable("trucks", "unit_number", true);
-  const { rows: invoices } = useTable("invoices");
-  const docs = useDocuments();
-  const { profile } = useAuth();
+  const { profile, activeCompanyId } = useAuth();
+  const { rows: loads, loading, error, insert, update, remove } = useTable("loads", "created_at", false, activeCompanyId);
+  const { rows: drivers } = useTable("drivers", "name", true, activeCompanyId);
+  const { rows: trucks } = useTable("trucks", "unit_number", true, activeCompanyId);
+  const { rows: invoices } = useTable("invoices", "created_at", false, activeCompanyId);
+  const docs = useDocuments(activeCompanyId);
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
 
   const [dispatchView, setDispatchView] = useState("driver board");

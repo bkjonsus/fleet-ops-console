@@ -12,11 +12,11 @@ import {
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
 
 export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, activeCompanyId } = useAuth();
   const myName = previewAsName || profile?.full_name;
-  const { rows: allLoads, update: updateLoad } = useTable("loads");
-  const { rows: allDrivers, update: updateDriver } = useTable("drivers", "name", true);
-  const docs = useDocuments();
+  const { rows: allLoads, update: updateLoad } = useTable("loads", "created_at", false, activeCompanyId);
+  const { rows: allDrivers, update: updateDriver } = useTable("drivers", "name", true, activeCompanyId);
+  const docs = useDocuments(activeCompanyId);
 
   const myLoads = allLoads.filter((l) => l.driver === myName);
   const activeLoads = myLoads.filter((l) => l.status !== "Delivered" && l.status !== "Canceled" && l.status !== "TONU");

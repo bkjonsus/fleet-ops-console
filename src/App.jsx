@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Truck, FileText, Users, LogOut, Loader2 } from "lucide-react";
+import { Truck, FileText, Users, LogOut, Loader2, Building2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { useTable } from "./useTable";
 import { COLORS, inputStyle, Field } from "./ui";
@@ -9,6 +9,7 @@ import FleetPage from "./pages/FleetPage";
 import AccountingPage from "./pages/AccountingPage";
 import TeamPage from "./pages/TeamPage";
 import DriverAppPage from "./pages/DriverAppPage";
+import CompaniesPage from "./pages/CompaniesPage";
 
 // Which roles can EDIT each section (everyone whose role grants at least view access can see it;
 // this list controls whether Save/Delete/Status buttons are shown).
@@ -18,15 +19,15 @@ const CAN_EDIT_MONEY = ["admin", "accounting"];
 const CAN_VIEW_MONEY = ["admin", "accounting", "ops_viewer"];
 
 function Shell() {
-  const { user, profile, role, loading, signOut } = useAuth();
+  const { user, profile, role, loading, signOut, isSuperAdmin, activeCompanyId, setActiveCompanyId, companies } = useAuth();
   const [tab, setTab] = useState("dispatch");
   const [previewDriverName, setPreviewDriverName] = useState(null);
-  const { rows: allDrivers } = useTable("drivers", "name", true);
+  const { rows: allDrivers } = useTable("drivers", "name", true, activeCompanyId);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.bg, color: COLORS.muted }}>
-        <Loader2 className="animate-spin mr-2" size={20} /> Loading…
+        <Loader2 className="animate-spin mr-2" size={20} /> Loading\u2026
       </div>
     );
   }
@@ -61,6 +62,7 @@ function Shell() {
     { key: "accounting", label: "Accounting", icon: FileText, visible: CAN_VIEW_MONEY.includes(role) },
     { key: "team", label: "Team", icon: Users, visible: role === "admin" },
     { key: "driverapp", label: "Driver App", icon: Truck, visible: role === "admin" },
+    { key: "companies", label: "Companies", icon: Building2, visible: isSuperAdmin },
   ].filter((t) => t.visible);
 
   // If the active tab isn't visible for this role (e.g. after a role change), fall back to the first visible tab.
@@ -79,8 +81,21 @@ function Shell() {
           </button>
         </div>
         <p className="text-xs mt-1" style={{ color: COLORS.muted }}>
-          {profile?.full_name} · {role.replace("_", " ")}
+          {profile?.full_name} \u00b7 {role.replace("_", " ")}
         </p>
+
+        {isSuperAdmin && companies.length > 0 && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <Building2 size={14} style={{ color: COLORS.muted }} />
+            <select
+              value={activeCompanyId || ""}
+              onChange={(e) => setActiveCompanyId(e.target.value)}
+              style={{ ...inputStyle, fontSize: 12, padding: "5px 8px" }}
+            >
+              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}{c.status !== "Active" ? ` (${c.status})` : ""}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap px-4 gap-1 pt-3" style={{ background: COLORS.surface, borderBottom: `2px dashed ${COLORS.line}` }}>
@@ -101,6 +116,9 @@ function Shell() {
         {activeTab === "fleet" && <FleetPage canEdit={CAN_EDIT_FLEET.includes(role)} />}
         {activeTab === "accounting" && <AccountingPage canEdit={CAN_EDIT_MONEY.includes(role)} canViewMoney={CAN_VIEW_MONEY.includes(role)} />}
         {activeTab === "team" && role === "admin" && <TeamPage />}
+        {activeTab === "companies" && isSuperAdmin && (
+          <CompaniesPage onCompanyCreated={(c) => setActiveCompanyId(c.id)} />
+        )}
         {activeTab === "driverapp" && role === "admin" && (
           previewDriverName ? (
             <DriverAppPage previewAsName={previewDriverName} isPreview onExitPreview={() => setPreviewDriverName(null)} />

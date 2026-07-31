@@ -150,13 +150,13 @@ export default function TeamPage() {
               <div>
                 <div className="text-sm font-bold" style={{ color: COLORS.text }}>{p.full_name}{isSelf && <span style={{ color: COLORS.muted, fontWeight: 400 }}> (you)</span>}</div>
                 <div className="text-xs flex items-center gap-2 mt-0.5" style={{ color: COLORS.muted }}>
-                  <span>{ROLE_LABELS[p.role] || p.role}</span>
-                  {p.companies?.name && <Pill color={COLORS.amber}>{p.companies.name}</Pill>}
+                  <span>{p.is_super_admin ? "Super Admin" : (ROLE_LABELS[p.role] || p.role)}</span>
+                  {!p.is_super_admin && p.companies?.name && <Pill color={COLORS.amber}>{p.companies.name}</Pill>}
                 </div>
               </div>
               {isSelf ? (
                 <span className="text-[11px]" style={{ color: COLORS.muted }} title="Ask another admin to change your role, so you can't accidentally lock yourself out.">
-                  Can't change your own role
+                  {p.is_super_admin ? "BK TMS Owner" : "Can't change your own role"}
                 </span>
               ) : (
                 <select value={p.role} onChange={(e) => changeRole(p.id, e.target.value)} style={{ ...inputStyle, fontSize: 12 }}>

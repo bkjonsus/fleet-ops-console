@@ -9,6 +9,7 @@ const CONTRACT_TYPES = ["Company - Per Mile", "Company - Percentage", "Owner Ope
 const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
 const TRAILER_OWNERSHIP = ["Company Owned", "Short-Term Rental"];
 const TRAILER_TYPES = ["Dry Van", "Reefer", "Flatbed", "Step Deck", "Other"];
+const SPEED_ALERT_MPH = 80; // fixed threshold, not tied to any road's actual posted limit
 
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
@@ -381,9 +382,7 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
 
 // Continental US bounding box, used to project lat/lng onto the map area's percentage
 // coordinates. Only shows drivers with a live_location_at fix inside the last 10
-// minutes \u2014 real GPS only, nothing simulated. Requires the "Share My Location"
-// feature (Driver App) to have been used at least once, and the drivers.live_lat /
-// live_lng / live_location_at columns to exist (see the migration that shipped with it).
+// minutes \u2014 real GPS only, nothing simulated.
 const MAP_BOUNDS = { latMin: 24.5, latMax: 49.5, lngMin: -125, lngMax: -66.5 };
 function projectLatLng(lat, lng) {
   const x = ((lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)) * 100;
@@ -401,16 +400,24 @@ function LiveMapPanel({ companyId }) {
     return now - new Date(d.live_location_at).getTime() < 10 * 60 * 1000;
   });
   const selected = pins.find((p) => p.id === selectedId);
+  const speedingCount = pins.filter((d) => d.live_speed_mph > SPEED_ALERT_MPH).length;
 
   return (
     <div>
       <div className="mb-3 p-2 rounded flex items-start gap-2" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.line}` }}>
         <span className="text-[11px]" style={{ color: COLORS.muted }}>
-          Shows drivers actively sharing their location from the Driver App ("Share My Location").
-          Real GPS, updates while their browser/app stays open with permission granted \u2014 drivers not
-          currently sharing won't appear here.
+          Shows drivers actively sharing their location from the Driver App (starts automatically when
+          they open it). Speed comes from the same GPS reading — flagged in red above {SPEED_ALERT_MPH} mph
+          (a fixed threshold, not each road's actual posted limit). Drivers not currently sharing won't
+          appear here.
         </span>
       </div>
+
+      {speedingCount > 0 && (
+        <div className="mb-3 p-2 rounded text-xs font-bold" style={{ background: "#3A1E20", border: `1px solid ${COLORS.red}`, color: COLORS.red }}>
+          ⚠ {speedingCount} driver{speedingCount === 1 ? "" : "s"} currently over {SPEED_ALERT_MPH} mph
+        </div>
+      )}
 
       <div className="relative rounded overflow-hidden" style={{ width: "100%", aspectRatio: "1.6", background: "#0d1420", border: `1px solid ${COLORS.line}` }}>
         <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
@@ -423,6 +430,8 @@ function LiveMapPanel({ companyId }) {
         </svg>
         {pins.map((d) => {
           const pos = projectLatLng(d.live_lat, d.live_lng);
+          const speeding = d.live_speed_mph > SPEED_ALERT_MPH;
+          const color = speeding ? COLORS.red : "#3B82F6";
           return (
             <button
               key={d.id}
@@ -430,8 +439,8 @@ function LiveMapPanel({ companyId }) {
               className="flex items-center justify-center rounded-full"
               style={{
                 position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -50%)",
-                width: 14, height: 14, background: "#3B82F6", border: `2px solid ${COLORS.bg}`,
-                boxShadow: selectedId === d.id ? "0 0 0 4px #3B82F655" : "0 0 0 3px #3B82F640",
+                width: 14, height: 14, background: color, border: `2px solid ${COLORS.bg}`,
+                boxShadow: selectedId === d.id ? `0 0 0 4px ${color}55` : `0 0 0 3px ${color}40`,
                 zIndex: selectedId === d.id ? 2 : 1,
               }}
               title={d.name}
@@ -441,10 +450,15 @@ function LiveMapPanel({ companyId }) {
       </div>
 
       {selected && (
-        <div className="mt-2 p-3 rounded" style={{ background: COLORS.surface, border: "1px solid #3B82F6" }}>
+        <div className="mt-2 p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${selected.live_speed_mph > SPEED_ALERT_MPH ? COLORS.red : "#3B82F6"}` }}>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <span className="text-sm font-bold" style={{ color: COLORS.text }}>{selected.name}</span>
-            <Pill color="#3B82F6">Live GPS</Pill>
+            <div className="flex items-center gap-2">
+              {selected.live_speed_mph != null && (
+                <Pill color={selected.live_speed_mph > SPEED_ALERT_MPH ? COLORS.red : COLORS.amber}>{selected.live_speed_mph} mph</Pill>
+              )}
+              <Pill color="#3B82F6">Live GPS</Pill>
+            </div>
           </div>
           <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
             Last update {new Date(selected.live_location_at).toLocaleTimeString()}
@@ -465,7 +479,10 @@ function LiveMapPanel({ companyId }) {
             style={{ background: selectedId === d.id ? COLORS.surfaceAlt : COLORS.surface, border: `1px solid ${COLORS.line}`, color: COLORS.text }}
           >
             <span>{d.name}</span>
-            <Pill color="#3B82F6">Live</Pill>
+            <div className="flex items-center gap-2">
+              {d.live_speed_mph != null && <Pill color={d.live_speed_mph > SPEED_ALERT_MPH ? COLORS.red : COLORS.amber}>{d.live_speed_mph} mph</Pill>}
+              <Pill color="#3B82F6">Live</Pill>
+            </div>
           </button>
         ))}
       </div>

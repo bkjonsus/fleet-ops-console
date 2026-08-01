@@ -10,6 +10,7 @@ import {
 } from "../ui";
 
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
+const SPEED_LOG_INTERVAL_MS = 60 * 1000; // one recorded row per minute, not every GPS tick
 
 export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
   const { profile, signOut, activeCompanyId } = useAuth();
@@ -50,7 +51,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
       )}
 
       {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} />}
-      {myDriverRecord && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} />}
+      {myDriverRecord && !isPreview && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} />}
 
       <h2 className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: COLORS.text }}>
         Active Loads <span style={{ color: COLORS.muted }}>({activeLoads.length})</span>
@@ -126,81 +127,87 @@ function AvailabilityCard({ driver, updateDriver }) {
   );
 }
 
-// Uses the phone's real GPS via the browser's Geolocation API. No third-party
-// fleet-tracking vendor needed for this piece \u2014 the driver grants location
-// permission once, and their real position streams straight into their own
-// driver row (live_lat / live_lng / live_location_at).
-function LiveLocationCard({ driver, updateDriver }) {
-  const [sharing, setSharing] = useState(false);
+// Always-on location + speed sharing. Starts automatically as soon as the driver
+// opens this page (no button to press) \u2014 the only user action involved is the
+// one-time native permission prompt the first time. Real GPS speed comes free as
+// part of the same reading the browser already gives us; no extra API needed.
+// Speed readings are throttled to one recorded row per minute (SPEED_LOG_INTERVAL_MS)
+// so watching a driver for hours doesn't flood the table with thousands of rows.
+function LiveLocationCard({ driver, updateDriver, companyId }) {
+  const [status, setStatus] = useState("starting"); // starting | sharing | error
   const [error, setError] = useState("");
+  const [currentSpeed, setCurrentSpeed] = useState(null);
   const watchIdRef = useRef(null);
+  const lastLogRef = useRef(0);
+  const { insert: insertSpeedLog } = useTable("driver_speed_logs", "recorded_at", false, companyId);
 
   useEffect(() => {
+    startSharing();
     return () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function startSharing() {
     if (!navigator.geolocation) {
+      setStatus("error");
       setError("This browser doesn't support location sharing.");
       return;
     }
-    setError("");
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        setSharing(true);
+        setStatus("sharing");
+        setError("");
+        const speedMph = pos.coords.speed != null ? Math.round(pos.coords.speed * 2.23694) : null;
+        setCurrentSpeed(speedMph);
         updateDriver(driver.id, {
           live_lat: pos.coords.latitude,
           live_lng: pos.coords.longitude,
           live_location_at: new Date().toISOString(),
+          live_speed_mph: speedMph,
         });
+
+        const now = Date.now();
+        if (now - lastLogRef.current > SPEED_LOG_INTERVAL_MS) {
+          lastLogRef.current = now;
+          insertSpeedLog({
+            driver_id: driver.id,
+            speed_mph: speedMph,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        }
       },
       (err) => {
-        setSharing(false);
-        setError(err.code === 1 ? "Location permission denied." : "Couldn't get your location.");
+        setStatus("error");
+        setError(err.code === 1 ? "Location permission denied \u2014 enable it in your browser/phone settings to share your position." : "Couldn't get your location.");
       },
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
     );
   }
-
-  function stopSharing() {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    setSharing(false);
-    updateDriver(driver.id, { live_lat: null, live_lng: null, live_location_at: null });
-  }
-
-  const hasRecentFix = driver.live_location_at && (Date.now() - new Date(driver.live_location_at).getTime()) < 10 * 60 * 1000;
-  const active = sharing || hasRecentFix;
 
   return (
     <div className="p-3 mt-3 rounded flex items-center justify-between gap-2 flex-wrap" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
       <div className="flex items-center gap-2">
         <span
           className="flex items-center justify-center rounded-full"
-          style={{ width: 8, height: 8, background: hasRecentFix ? COLORS.green : COLORS.muted, flexShrink: 0 }}
+          style={{ width: 8, height: 8, background: status === "sharing" ? COLORS.green : status === "error" ? COLORS.red : COLORS.muted, flexShrink: 0 }}
         />
         <div>
           <div className="text-xs font-bold" style={{ color: COLORS.text }}>
-            {hasRecentFix ? "Sharing live location" : "Not sharing location"}
+            {status === "sharing" ? "Sharing live location" : status === "error" ? "Location sharing unavailable" : "Starting location sharing\u2026"}
           </div>
-          {error && <div className="text-[10px]" style={{ color: COLORS.red }}>{error}</div>}
+          {error && (
+            <div className="text-[10px]" style={{ color: COLORS.red }}>
+              {error} {status === "error" && <button onClick={startSharing} className="underline">Retry</button>}
+            </div>
+          )}
         </div>
       </div>
-      <button
-        onClick={active ? stopSharing : startSharing}
-        className="text-[10px] font-bold uppercase px-2 py-1 rounded"
-        style={{
-          background: active ? "transparent" : COLORS.green,
-          color: active ? COLORS.red : "#08210F",
-          border: active ? `1px solid ${COLORS.red}` : "none",
-        }}
-      >
-        {active ? "Stop Sharing" : "Share My Location"}
-      </button>
+      {status === "sharing" && currentSpeed !== null && (
+        <Pill color={currentSpeed > 80 ? COLORS.red : COLORS.amber}>{currentSpeed} mph</Pill>
+      )}
     </div>
   );
 }

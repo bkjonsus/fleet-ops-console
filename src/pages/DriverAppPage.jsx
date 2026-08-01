@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { LogOut, Truck } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
@@ -50,6 +50,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
       )}
 
       {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} />}
+      {myDriverRecord && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} />}
 
       <h2 className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: COLORS.text }}>
         Active Loads <span style={{ color: COLORS.muted }}>({activeLoads.length})</span>
@@ -121,6 +122,85 @@ function AvailabilityCard({ driver, updateDriver }) {
           placeholder="e.g. Want to head toward FL next, home by Sunday…"
         />
       </Field>
+    </div>
+  );
+}
+
+// Uses the phone's real GPS via the browser's Geolocation API. No third-party
+// fleet-tracking vendor needed for this piece \u2014 the driver grants location
+// permission once, and their real position streams straight into their own
+// driver row (live_lat / live_lng / live_location_at).
+function LiveLocationCard({ driver, updateDriver }) {
+  const [sharing, setSharing] = useState(false);
+  const [error, setError] = useState("");
+  const watchIdRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, []);
+
+  function startSharing() {
+    if (!navigator.geolocation) {
+      setError("This browser doesn't support location sharing.");
+      return;
+    }
+    setError("");
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        setSharing(true);
+        updateDriver(driver.id, {
+          live_lat: pos.coords.latitude,
+          live_lng: pos.coords.longitude,
+          live_location_at: new Date().toISOString(),
+        });
+      },
+      (err) => {
+        setSharing(false);
+        setError(err.code === 1 ? "Location permission denied." : "Couldn't get your location.");
+      },
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+    );
+  }
+
+  function stopSharing() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setSharing(false);
+    updateDriver(driver.id, { live_lat: null, live_lng: null, live_location_at: null });
+  }
+
+  const hasRecentFix = driver.live_location_at && (Date.now() - new Date(driver.live_location_at).getTime()) < 10 * 60 * 1000;
+  const active = sharing || hasRecentFix;
+
+  return (
+    <div className="p-3 mt-3 rounded flex items-center justify-between gap-2 flex-wrap" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+      <div className="flex items-center gap-2">
+        <span
+          className="flex items-center justify-center rounded-full"
+          style={{ width: 8, height: 8, background: hasRecentFix ? COLORS.green : COLORS.muted, flexShrink: 0 }}
+        />
+        <div>
+          <div className="text-xs font-bold" style={{ color: COLORS.text }}>
+            {hasRecentFix ? "Sharing live location" : "Not sharing location"}
+          </div>
+          {error && <div className="text-[10px]" style={{ color: COLORS.red }}>{error}</div>}
+        </div>
+      </div>
+      <button
+        onClick={active ? stopSharing : startSharing}
+        className="text-[10px] font-bold uppercase px-2 py-1 rounded"
+        style={{
+          background: active ? "transparent" : COLORS.green,
+          color: active ? COLORS.red : "#08210F",
+          border: active ? `1px solid ${COLORS.red}` : "none",
+        }}
+      >
+        {active ? "Stop Sharing" : "Share My Location"}
+      </button>
     </div>
   );
 }

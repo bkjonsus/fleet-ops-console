@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
@@ -10,6 +12,7 @@ const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
 const TRAILER_OWNERSHIP = ["Company Owned", "Short-Term Rental"];
 const TRAILER_TYPES = ["Dry Van", "Reefer", "Flatbed", "Step Deck", "Other"];
 const SPEED_ALERT_MPH = 80; // fixed threshold, not tied to any road's actual posted limit
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
@@ -380,19 +383,15 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
   );
 }
 
-// Continental US bounding box, used to project lat/lng onto the map area's percentage
-// coordinates. Only shows drivers with a live_location_at fix inside the last 10
-// minutes \u2014 real GPS only, nothing simulated.
-const MAP_BOUNDS = { latMin: 24.5, latMax: 49.5, lngMin: -125, lngMax: -66.5 };
-function projectLatLng(lat, lng) {
-  const x = ((lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)) * 100;
-  const y = ((MAP_BOUNDS.latMax - lat) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)) * 100;
-  return { x: Math.min(99, Math.max(1, x)), y: Math.min(99, Math.max(1, y)) };
-}
-
+// Real Mapbox map, real driver GPS pins. Only shows drivers with a live_location_at
+// fix inside the last 10 minutes. Requires VITE_MAPBOX_TOKEN to be set as an env var
+// (Vercel + local .env) or this shows a setup message instead of crashing.
 function LiveMapPanel({ companyId }) {
   const { rows: drivers } = useTable("drivers", "name", true, companyId);
   const [selectedId, setSelectedId] = useState(null);
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({});
 
   const now = Date.now();
   const pins = drivers.filter((d) => {
@@ -401,6 +400,65 @@ function LiveMapPanel({ companyId }) {
   });
   const selected = pins.find((p) => p.id === selectedId);
   const speedingCount = pins.filter((d) => d.live_speed_mph > SPEED_ALERT_MPH).length;
+
+  // Initialize the map once
+  useEffect(() => {
+    if (!MAPBOX_TOKEN || !mapContainerRef.current || mapRef.current) return;
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: "mapbox://styles/mapbox/dark-v11",
+      center: [-98.5, 39.5], // roughly the center of the continental US
+      zoom: 3.2,
+    });
+    mapRef.current.addControl(new mapboxgl.NavigationControl(), "top-right");
+    return () => {
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Keep markers in sync with the current set of sharing drivers
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const currentIds = new Set(pins.map((p) => p.id));
+
+    Object.keys(markersRef.current).forEach((id) => {
+      if (!currentIds.has(id)) {
+        markersRef.current[id].remove();
+        delete markersRef.current[id];
+      }
+    });
+
+    pins.forEach((d) => {
+      const speeding = d.live_speed_mph > SPEED_ALERT_MPH;
+      const color = speeding ? "#E5484D" : "#3B82F6";
+      if (markersRef.current[d.id]) {
+        markersRef.current[d.id].setLngLat([d.live_lng, d.live_lat]);
+        markersRef.current[d.id].getElement().style.background = color;
+      } else {
+        const el = document.createElement("div");
+        el.style.width = "16px";
+        el.style.height = "16px";
+        el.style.borderRadius = "50%";
+        el.style.background = color;
+        el.style.border = "2px solid #0B1119";
+        el.style.cursor = "pointer";
+        el.onclick = () => setSelectedId((prev) => (prev === d.id ? null : d.id));
+        markersRef.current[d.id] = new mapboxgl.Marker(el).setLngLat([d.live_lng, d.live_lat]).addTo(mapRef.current);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pins.map((p) => `${p.id}:${p.live_lat}:${p.live_lng}:${p.live_speed_mph}`).join(",")]);
+
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="p-4 rounded text-xs" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}`, color: COLORS.red }}>
+        Mapbox isn't configured yet. Add <code>VITE_MAPBOX_TOKEN</code> as an environment variable in Vercel
+        (Settings → Environment Variables) and in a local <code>.env</code> file, then redeploy.
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -419,35 +477,7 @@ function LiveMapPanel({ companyId }) {
         </div>
       )}
 
-      <div className="relative rounded overflow-hidden" style={{ width: "100%", aspectRatio: "1.6", background: "#0d1420", border: `1px solid ${COLORS.line}` }}>
-        <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
-          {Array.from({ length: 9 }).map((_, i) => (
-            <line key={`v${i}`} x1={`${(i + 1) * 10}%`} y1="0" x2={`${(i + 1) * 10}%`} y2="100%" stroke={COLORS.line} strokeWidth="1" />
-          ))}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <line key={`h${i}`} x1="0" y1={`${(i + 1) * 16.6}%`} x2="100%" y2={`${(i + 1) * 16.6}%`} stroke={COLORS.line} strokeWidth="1" />
-          ))}
-        </svg>
-        {pins.map((d) => {
-          const pos = projectLatLng(d.live_lat, d.live_lng);
-          const speeding = d.live_speed_mph > SPEED_ALERT_MPH;
-          const color = speeding ? COLORS.red : "#3B82F6";
-          return (
-            <button
-              key={d.id}
-              onClick={() => setSelectedId(selectedId === d.id ? null : d.id)}
-              className="flex items-center justify-center rounded-full"
-              style={{
-                position: "absolute", left: `${pos.x}%`, top: `${pos.y}%`, transform: "translate(-50%, -50%)",
-                width: 14, height: 14, background: color, border: `2px solid ${COLORS.bg}`,
-                boxShadow: selectedId === d.id ? `0 0 0 4px ${color}55` : `0 0 0 3px ${color}40`,
-                zIndex: selectedId === d.id ? 2 : 1,
-              }}
-              title={d.name}
-            />
-          );
-        })}
-      </div>
+      <div ref={mapContainerRef} style={{ width: "100%", height: 400, borderRadius: 8, overflow: "hidden", border: `1px solid ${COLORS.line}` }} />
 
       {selected && (
         <div className="mt-2 p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${selected.live_speed_mph > SPEED_ALERT_MPH ? COLORS.red : "#3B82F6"}` }}>

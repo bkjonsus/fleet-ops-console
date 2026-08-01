@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
@@ -13,6 +13,7 @@ import {
 } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled", "TONU"];
+const TRIP_SUBVIEWS = ["upcoming", "in transit", "history"];
 const statusColor = (s) => {
   if (["Delivered", "Paid"].includes(s)) return COLORS.green;
   if (["Delayed", "Overdue", "Canceled", "TONU", "Not Assigned"].includes(s)) return COLORS.red;
@@ -81,6 +82,7 @@ export default function DispatchPage({ canEdit, role }) {
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
 
   const [dispatchView, setDispatchView] = useState("driver board");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blankLoad());
   const [showFilters, setShowFilters] = useState(false);
@@ -91,6 +93,11 @@ export default function DispatchPage({ canEdit, role }) {
   const [showPrintView, setShowPrintView] = useState(false);
 
   const UPCOMING_STATUSES = ["Assigned"];
+
+  const MENU_ITEMS = [
+    { key: "driver board", label: "Driver Board" },
+    { key: "trips", label: "Trips" },
+  ];
 
   function addStopToForm() {
     const newStops = [...form.stops];
@@ -172,23 +179,59 @@ export default function DispatchPage({ canEdit, role }) {
     <div>
       <ErrorBanner message={error} />
 
-      <div className="flex items-center gap-1 mb-2 flex-wrap">
-        {["driver board", "upcoming", "in transit", "history"].map((v) => (
-          <button
-            key={v}
-            onClick={() => setDispatchView(v)}
-            className="px-2 py-1 text-[11px] font-bold uppercase rounded"
-            style={{
-              background: dispatchView === v ? COLORS.surfaceAlt : "transparent",
-              color: dispatchView === v ? COLORS.amber : COLORS.muted,
-              border: `1px solid ${dispatchView === v ? COLORS.amber : COLORS.line}`,
-            }}
-          >
-            {v}
-          </button>
-        ))}
-        {dispatchView !== "driver board" && (
-          <div className="flex items-center gap-1.5 relative ml-auto">
+      <div className="flex items-center gap-3 mb-3">
+        <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+          <Menu size={22} />
+        </button>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Dispatch</div>
+          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{dispatchView}</div>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Dispatch Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            {MENU_ITEMS.map((v) => {
+              const isActive = v.key === "trips" ? TRIP_SUBVIEWS.includes(dispatchView) : dispatchView === v.key;
+              return (
+                <button
+                  key={v.key}
+                  onClick={() => { setDispatchView(v.key === "trips" ? (TRIP_SUBVIEWS.includes(dispatchView) ? dispatchView : "upcoming") : v.key); setMenuOpen(false); }}
+                  className="text-left px-3 py-2.5 text-xs font-bold uppercase"
+                  style={{ color: isActive ? COLORS.amber : COLORS.text, borderBottom: `1px solid ${COLORS.line}`, background: isActive ? COLORS.surfaceAlt : "transparent" }}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {TRIP_SUBVIEWS.includes(dispatchView) && (
+        <div className="flex items-center gap-1 mb-2 flex-wrap justify-between">
+          <div className="flex items-center gap-1">
+            {TRIP_SUBVIEWS.map((v) => (
+              <button
+                key={v}
+                onClick={() => setDispatchView(v)}
+                className="px-2 py-1 text-[11px] font-bold uppercase rounded"
+                style={{
+                  background: dispatchView === v ? COLORS.surfaceAlt : "transparent",
+                  color: dispatchView === v ? COLORS.amber : COLORS.muted,
+                  border: `1px solid ${dispatchView === v ? COLORS.amber : COLORS.line}`,
+                }}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5 relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
               title="Filter"
@@ -215,8 +258,8 @@ export default function DispatchPage({ canEdit, role }) {
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {dispatchView === "driver board" ? (
         <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTable } from "../useTable";
@@ -125,7 +125,7 @@ function DriversPanel({ canEdit, docs, currentUser, companyId }) {
                   <Pill color={COLORS.amber}>{d.contract_type}</Pill>
                   {d.cdl_expiry_date && <Pill color={returnColor(cdlDays)}>CDL {returnLabel(cdlDays)}</Pill>}
                 </div>
-                {canEdit && <button onClick={() => remove(d.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+                {canEdit && <button onClick={() => remove(d.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
               </div>
               <div className="text-xs flex flex-wrap gap-x-4 gap-y-1 mt-1" style={{ color: COLORS.muted }}>
                 {d.phone && <span>{d.phone}</span>}
@@ -235,7 +235,7 @@ function TrucksPanel({ canEdit, docs, currentUser, companyId }) {
                 <Pill color={t.ownership === "Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
               </div>
-              {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+              {canEdit && <button onClick={() => remove(t.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
             </div>
             <div className="text-xs mt-1" style={{ color: COLORS.text }}>
               {[t.year, t.make, t.model].filter(Boolean).join(" ")}
@@ -350,7 +350,7 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
                 <Pill color={t.ownership === "Short-Term Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Short-Term Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
               </div>
-              {canEdit && <button onClick={() => remove(t.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+              {canEdit && <button onClick={() => remove(t.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
             </div>
             <div className="text-xs mt-1" style={{ color: COLORS.text }}>
               {[t.year, t.make, t.model].filter(Boolean).join(" ")}

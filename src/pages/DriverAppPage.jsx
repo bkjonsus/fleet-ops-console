@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { LogOut, Truck } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
+import { useDriverMessages } from "../useMessages";
 import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Pill, EmptyState, money, getStops, shortLocation,
   formatDateTimeCompact, StopCircle, DRIVER_BOARD_STATUSES, driverBoardStatusColor,
-  DocumentsSection,
+  DocumentsSection, MessageThread,
 } from "../ui";
 
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
@@ -54,6 +55,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
       {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} />}
       {myDriverRecord && !isPreview && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} />}
       {myDriverRecord && <MyDocumentsCard driver={myDriverRecord} docs={docs} currentUser={myName} />}
+      {myDriverRecord && <MessagesCard driver={myDriverRecord} companyId={activeCompanyId} myName={myName} />}
 
       <h2 className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: COLORS.text }}>
         Active Loads <span style={{ color: COLORS.muted }}>({activeLoads.length})</span>
@@ -109,12 +111,6 @@ function AvailabilityCard({ driver, updateDriver }) {
       <Field label="Ready City">
         <input style={inputStyle} value={readyCity} onChange={(e) => setReadyCity(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_city: readyCity })} placeholder="Dallas, TX" />
       </Field>
-      {driver.dispatch_note && (
-        <div className="p-2 rounded" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.line}` }}>
-          <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: COLORS.amber }}>Message from Dispatch</div>
-          <div className="text-[11px]" style={{ color: COLORS.text }}>{driver.dispatch_note}</div>
-        </div>
-      )}
       <Field label="My Comments (preferred lanes, home time, plans, etc.)">
         <textarea
           style={{ ...inputStyle, width: "100%" }}
@@ -234,6 +230,30 @@ function MyDocumentsCard({ driver, docs, currentUser }) {
         canEdit={true}
         canDelete={false}
         flagForReview={true}
+      />
+    </div>
+  );
+}
+
+// Real two-way thread with dispatch, replacing the old one-way "note" field.
+// Unread messages from dispatch are marked read as soon as the driver opens this card.
+function MessagesCard({ driver, companyId, myName }) {
+  const { messages, sendMessage, markThreadRead } = useDriverMessages(driver.id, companyId);
+  const unreadCount = messages.filter((m) => m.sender === "dispatch" && !m.read).length;
+
+  useEffect(() => {
+    if (unreadCount > 0) markThreadRead("dispatch");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length]);
+
+  return (
+    <div className="p-3 mt-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+      <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.amber }}>Messages with Dispatch</div>
+      <MessageThread
+        messages={messages}
+        onSend={(text) => sendMessage("driver", myName, text)}
+        mySender="driver"
+        placeholder="Message dispatch…"
       />
     </div>
   );

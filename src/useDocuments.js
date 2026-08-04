@@ -5,9 +5,11 @@ const BUCKET = "documents";
 const MAX_BYTES = 15 * 1024 * 1024; // Storage isn't as tight as the old artifact's 5MB key limit
 
 export function useDocuments(companyId) {
-  const { rows: documents, loading, error, insert, remove: removeRow, refresh } = useTable("documents", "created_at", false, companyId);
+  const { rows: documents, loading, error, insert, update, remove: removeRow, refresh } = useTable("documents", "created_at", false, companyId);
 
   // Uploads the file to Storage, then inserts the metadata row. Returns true/false.
+  // meta.reviewStatus is optional — pass "pending" when a driver is uploading their
+  // own compliance doc, so Fleet can confirm or reject it before it counts as valid.
   async function uploadDocument(meta, file) {
     if (!file) return false;
     if (file.size > MAX_BYTES) return false;
@@ -32,6 +34,7 @@ export function useDocuments(companyId) {
       file_name: file.name,
       mime_type: file.type,
       created_by: meta.createdBy || null,
+      review_status: meta.reviewStatus || null,
     });
     if (insertError) {
       // Clean up the orphaned file if the metadata insert failed
@@ -53,5 +56,12 @@ export function useDocuments(companyId) {
     return removeRow(doc.id);
   }
 
-  return { documents, loading, error, uploadDocument, viewDocument, deleteDocument, refresh };
+  function confirmDocument(doc) {
+    return update(doc.id, { review_status: "confirmed" });
+  }
+  function rejectDocument(doc) {
+    return update(doc.id, { review_status: "rejected" });
+  }
+
+  return { documents, loading, error, uploadDocument, viewDocument, deleteDocument, confirmDocument, rejectDocument, refresh };
 }

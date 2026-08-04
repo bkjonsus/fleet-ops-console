@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LogOut, Truck } from "lucide-react";
+import { LogOut, Truck, MessageCircle, X } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -13,6 +13,30 @@ import {
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
 const SPEED_LOG_INTERVAL_MS = 60 * 1000; // one recorded row per minute, not every GPS tick
 const DRIVER_DOC_TYPES = ["CDL", "Medical Card / DOT Physical", "Drug & Alcohol Test", "Driving Record (MVR)", "Other"];
+
+// Wraps children (the existing message thread) in a floating chat-bubble style
+// popup instead of an always-visible inline card — tap the bubble to open/close.
+function FloatingMessages({ children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="fixed z-40" style={{ bottom: 16, right: 16 }}>
+      <button onClick={() => setOpen(!open)} title="Messages" className="relative flex items-center justify-center rounded-full" style={{ width: 48, height: 48, background: COLORS.amber, color: COLORS.bg, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+        <MessageCircle size={22} />
+      </button>
+      {open && (
+        <div className="rounded flex flex-col" style={{ position: "absolute", bottom: 60, right: 0, width: 320, maxWidth: "90vw", maxHeight: 420, background: COLORS.surface, border: `1px solid ${COLORS.line}`, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+          <div className="flex items-center justify-between p-2" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+            <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Messages</span>
+            <button onClick={() => setOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+          </div>
+          <div className="p-3 overflow-y-auto" style={{ flex: 1 }}>
+            {children}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
   const { profile, signOut, activeCompanyId } = useAuth();
@@ -247,15 +271,14 @@ function MessagesCard({ driver, companyId, myName }) {
   }, [messages.length]);
 
   return (
-    <div className="p-3 mt-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
-      <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.amber }}>Messages with Dispatch</div>
+      <FloatingMessages>
       <MessageThread
         messages={messages}
         onSend={(text) => sendMessage("driver", myName, text)}
         mySender="driver"
         placeholder="Message dispatch…"
       />
-    </div>
+      </FloatingMessages>
   );
 }
 

@@ -11,6 +11,7 @@ import {
 
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
 const SPEED_LOG_INTERVAL_MS = 60 * 1000; // one recorded row per minute, not every GPS tick
+const DRIVER_DOC_TYPES = ["CDL", "Medical Card / DOT Physical", "Drug & Alcohol Test", "Driving Record (MVR)", "Other"];
 
 export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
   const { profile, signOut, activeCompanyId } = useAuth();
@@ -52,6 +53,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
 
       {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} />}
       {myDriverRecord && !isPreview && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} />}
+      {myDriverRecord && <MyDocumentsCard driver={myDriverRecord} docs={docs} currentUser={myName} />}
 
       <h2 className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: COLORS.text }}>
         Active Loads <span style={{ color: COLORS.muted }}>({activeLoads.length})</span>
@@ -128,7 +130,7 @@ function AvailabilityCard({ driver, updateDriver }) {
 }
 
 // Always-on location + speed sharing. Starts automatically as soon as the driver
-// opens this page (no button to press) \u2014 the only user action involved is the
+// opens this page (no button to press) — the only user action involved is the
 // one-time native permission prompt the first time. Real GPS speed comes free as
 // part of the same reading the browser already gives us; no extra API needed.
 // Speed readings are throttled to one recorded row per minute (SPEED_LOG_INTERVAL_MS)
@@ -181,7 +183,7 @@ function LiveLocationCard({ driver, updateDriver, companyId }) {
       },
       (err) => {
         setStatus("error");
-        setError(err.code === 1 ? "Location permission denied \u2014 enable it in your browser/phone settings to share your position." : "Couldn't get your location.");
+        setError(err.code === 1 ? "Location permission denied — enable it in your browser/phone settings to share your position." : "Couldn't get your location.");
       },
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
     );
@@ -196,7 +198,7 @@ function LiveLocationCard({ driver, updateDriver, companyId }) {
         />
         <div>
           <div className="text-xs font-bold" style={{ color: COLORS.text }}>
-            {status === "sharing" ? "Sharing live location" : status === "error" ? "Location sharing unavailable" : "Starting location sharing\u2026"}
+            {status === "sharing" ? "Sharing live location" : status === "error" ? "Location sharing unavailable" : "Starting location sharing…"}
           </div>
           {error && (
             <div className="text-[10px]" style={{ color: COLORS.red }}>
@@ -208,6 +210,31 @@ function LiveLocationCard({ driver, updateDriver, companyId }) {
       {status === "sharing" && currentSpeed !== null && (
         <Pill color={currentSpeed > 80 ? COLORS.red : COLORS.amber}>{currentSpeed} mph</Pill>
       )}
+    </div>
+  );
+}
+
+// A driver's own compliance documents (CDL, medical card, etc.). New uploads are
+// flagged for Fleet review (flagForReview) — a driver can't confirm their own
+// document, and can't delete it once submitted (canDelete={false}), only replace
+// it with a fresh upload, which supersedes the old one automatically.
+function MyDocumentsCard({ driver, docs, currentUser }) {
+  return (
+    <div className="p-3 mt-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+      <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.amber }}>My Documents</div>
+      <DocumentsSection
+        documents={docs.documents}
+        category="Driver"
+        linkedTo={driver.name}
+        docTypes={DRIVER_DOC_TYPES}
+        uploadDocument={docs.uploadDocument}
+        deleteDocument={docs.deleteDocument}
+        viewDocument={docs.viewDocument}
+        currentUser={currentUser}
+        canEdit={true}
+        canDelete={false}
+        flagForReview={true}
+      />
     </div>
   );
 }
@@ -230,7 +257,7 @@ function DriverLoadCard({ load: l, updateLoad, docs, currentUser, readOnly }) {
         {stops.map((s, idx) => (
           <div key={s.id || idx} className="flex items-center gap-2 text-[11px]" style={{ color: COLORS.text }}>
             <StopCircle n={idx + 1} />
-            <span style={{ flex: 1 }}>{shortLocation(s.location) || "\u2014"}</span>
+            <span style={{ flex: 1 }}>{shortLocation(s.location) || "—"}</span>
             <span style={{ color: COLORS.muted }}>{formatDateTimeCompact(s.date, s.time)}</span>
           </div>
         ))}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Pencil, Building2, Trash2 } from "lucide-react";
+import { Plus, Pencil, Building2, Trash2, Menu, X } from "lucide-react";
 import { useTable } from "../useTable";
 import { COLORS, inputStyle, Field, Panel, Pill, EmptyState } from "../ui";
 
@@ -9,12 +9,15 @@ const SERVICE_MODULES = [
   { key: "accounting", label: "Accounting" },
   { key: "team", label: "Team Management" },
 ];
+const STATUS_FILTERS = ["All", "Active", "Trial", "Suspended"];
 
 export default function CompaniesPage({ onCompanyCreated }) {
   const { rows: companies, insert, update, remove } = useTable("companies", "name", true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [confirmDeleteFor, setConfirmDeleteFor] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("All");
   const blank = () => ({ name: "", contact_email: "", contact_phone: "", modules: ["dispatch"], status: "Active" });
   const [form, setForm] = useState(blank());
 
@@ -43,11 +46,44 @@ export default function CompaniesPage({ onCompanyCreated }) {
     closeForm();
   }
 
+  const filtered = filterStatus === "All" ? companies : companies.filter((c) => c.status === filterStatus);
+
   return (
     <div>
+      <div className="flex items-center gap-3 mb-3">
+        <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+          <Menu size={22} />
+        </button>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Companies</div>
+          <div className="text-sm font-bold" style={{ color: COLORS.text }}>{filterStatus === "All" ? "All Companies" : filterStatus}</div>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Companies Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => { setFilterStatus(s); setMenuOpen(false); }}
+                className="text-left px-3 py-2.5 text-xs font-bold uppercase"
+                style={{ color: filterStatus === s ? COLORS.amber : COLORS.text, borderBottom: `1px solid ${COLORS.line}`, background: filterStatus === s ? COLORS.surfaceAlt : "transparent" }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>
-          Companies <span style={{ color: COLORS.muted }}>({companies.length})</span>
+          {filterStatus === "All" ? "Companies" : filterStatus} <span style={{ color: COLORS.muted }}>({filtered.length})</span>
         </h2>
         <button onClick={() => { setEditingId(null); setForm(blank()); setShowForm(!showForm); }} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ background: COLORS.amber, color: COLORS.bg }}>
           <Plus size={14} /> New Company
@@ -90,10 +126,10 @@ export default function CompaniesPage({ onCompanyCreated }) {
         </Panel>
       )}
 
-      {companies.length === 0 && !showForm && <EmptyState text="No companies yet." />}
+      {filtered.length === 0 && !showForm && <EmptyState text={filterStatus === "All" ? "No companies yet." : `No ${filterStatus.toLowerCase()} companies.`} />}
 
       <div className="flex flex-col gap-2">
-        {companies.map((c) => (
+        {filtered.map((c) => (
           <div key={c.id} className="p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${c.status === "Suspended" ? COLORS.red : COLORS.line}` }}>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
@@ -103,7 +139,7 @@ export default function CompaniesPage({ onCompanyCreated }) {
                   <Pill color={c.status === "Active" ? COLORS.green : c.status === "Trial" ? COLORS.amber : COLORS.red}>{c.status}</Pill>
                 </div>
                 <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
-                  {c.contact_email && `${c.contact_email} \u00b7 `}{c.contact_phone}
+                  {c.contact_email && `${c.contact_email} · `}{c.contact_phone}
                 </div>
                 <div className="text-xs mt-1 flex flex-wrap gap-1.5">
                   {SERVICE_MODULES.map((m) => (

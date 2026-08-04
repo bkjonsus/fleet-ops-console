@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Users, Eye, Trash2 } from "lucide-react";
+import { Users, Eye, Trash2, Menu, X } from "lucide-react";
 import { useApplications } from "../useApplications";
 import { useTable } from "../useTable";
 import { useAuth } from "../AuthContext";
@@ -25,12 +25,13 @@ export default function HRPage() {
   const [copiedFlyer, setCopiedFlyer] = useState(false);
   const [filterStatus, setFilterStatus] = useState("All");
   const [confirmDeleteFor, setConfirmDeleteFor] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const applyLink = activeCompanyId
     ? `${window.location.origin}${window.location.pathname}?apply=1&company=${activeCompanyId}`
     : "";
   const flyerText = company
-    ? `\ud83d\ude9b NOW HIRING \u2014 ${company.name} is looking for drivers and staff!\n\nApply in just a couple minutes: ${applyLink}\n\n#Trucking #CDL #NowHiring #DriverJobs`
+    ? `🚛 NOW HIRING — ${company.name} is looking for drivers and staff!\n\nApply in just a couple minutes: ${applyLink}\n\n#Trucking #CDL #NowHiring #DriverJobs`
     : "";
 
   function copyText(text, setFlag) {
@@ -43,7 +44,7 @@ export default function HRPage() {
   async function convertToDriver(app) {
     await insertDriver({
       name: app.full_name, phone: app.phone, cdl_number: "", cdl_issue_date: "", cdl_expiry_date: "",
-      contract_type: CONTRACT_TYPES[0], status: "Active", notes: `Hired via application \u2014 ${app.years_experience || "?"} yrs experience.`,
+      contract_type: CONTRACT_TYPES[0], status: "Active", notes: `Hired via application — ${app.years_experience || "?"} yrs experience.`,
     });
     await updateApplication(app.id, { status: "Hired" });
   }
@@ -54,10 +55,48 @@ export default function HRPage() {
   }
 
   const filtered = filterStatus === "All" ? applications : applications.filter((a) => a.status === filterStatus);
+  const newCount = applications.filter((a) => a.status === "New").length;
 
   return (
     <div>
-      <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: COLORS.text }}>HR — Recruiting</h2>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+            <Menu size={22} />
+          </button>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>HR — Recruiting</div>
+            <div className="text-sm font-bold" style={{ color: COLORS.text }}>{filterStatus === "All" ? "All Applications" : filterStatus}</div>
+          </div>
+        </div>
+        {newCount > 0 && <Pill color={COLORS.red}>{newCount} new</Pill>}
+      </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>HR Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            {["All", ...APPLICATION_STATUSES].map((s) => (
+              <button
+                key={s}
+                onClick={() => { setFilterStatus(s); setMenuOpen(false); }}
+                className="text-left px-3 py-2.5 text-xs font-bold uppercase flex items-center justify-between"
+                style={{ color: filterStatus === s ? COLORS.amber : COLORS.text, borderBottom: `1px solid ${COLORS.line}`, background: filterStatus === s ? COLORS.surfaceAlt : "transparent" }}
+              >
+                {s}
+                {s === "New" && newCount > 0 && (
+                  <span className="flex items-center justify-center rounded-full" style={{ minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
+                    {newCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="p-3 rounded mb-4" style={{ background: COLORS.surface, border: `1px solid ${COLORS.amber}` }}>
         <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: COLORS.amber }}>Share Application Link</div>
@@ -78,30 +117,12 @@ export default function HRPage() {
         </button>
       </div>
 
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>
-          Applications <span style={{ color: COLORS.muted }}>({filtered.length})</span>
-        </h3>
-      </div>
-      <div className="flex flex-wrap gap-1 mb-3">
-        {["All", ...APPLICATION_STATUSES].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className="px-2 py-1 text-[11px] font-bold uppercase rounded"
-            style={{
-              background: filterStatus === s ? COLORS.amber : "transparent",
-              color: filterStatus === s ? COLORS.bg : COLORS.muted,
-              border: `1px solid ${filterStatus === s ? COLORS.amber : COLORS.line}`,
-            }}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      <h3 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: COLORS.text }}>
+        {filterStatus === "All" ? "Applications" : filterStatus} <span style={{ color: COLORS.muted }}>({filtered.length})</span>
+      </h3>
 
       {filtered.length === 0 ? (
-        <EmptyState text="No applications yet. Share the link above to start receiving them." />
+        <EmptyState text={applications.length === 0 ? "No applications yet. Share the link above to start receiving them." : `No ${filterStatus.toLowerCase()} applications.`} />
       ) : (
         <div className="flex flex-col gap-2">
           {filtered.map((app) => (
@@ -112,7 +133,7 @@ export default function HRPage() {
                 <Pill color={applicationStatusColor(app.status)}>{app.status}</Pill>
               </div>
               <div className="text-xs" style={{ color: COLORS.muted }}>
-                {app.phone} · {app.email}{app.years_experience && ` \u00b7 ${app.years_experience} yrs experience`}
+                {app.phone} · {app.email}{app.years_experience && ` · ${app.years_experience} yrs experience`}
               </div>
               {app.work_experience && <div className="text-xs" style={{ color: COLORS.text }}>{app.work_experience}</div>}
               {(app.cdl_file_path || app.cv_file_path) && (

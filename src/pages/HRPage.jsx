@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Users } from "lucide-react";
+import { Users, Eye, Trash2 } from "lucide-react";
 import { useApplications } from "../useApplications";
 import { useTable } from "../useTable";
 import { useAuth } from "../AuthContext";
@@ -117,8 +117,16 @@ export default function HRPage() {
               {app.work_experience && <div className="text-xs" style={{ color: COLORS.text }}>{app.work_experience}</div>}
               {(app.cdl_file_path || app.cv_file_path) && (
                 <div className="flex flex-wrap gap-3 text-[11px]">
-                  {app.cdl_file_path && <button onClick={() => handleViewFile(app.cdl_file_path)} className="font-bold uppercase" style={{ color: COLORS.amber }}>View CDL</button>}
-                  {app.cv_file_path && <button onClick={() => handleViewFile(app.cv_file_path)} className="font-bold uppercase" style={{ color: COLORS.amber }}>View CV / Resume</button>}
+                  {app.cdl_file_path && (
+                    <button onClick={() => handleViewFile(app.cdl_file_path)} className="flex items-center gap-1 font-bold uppercase" style={{ color: COLORS.amber }}>
+                      <Eye size={12} /> CDL
+                    </button>
+                  )}
+                  {app.cv_file_path && (
+                    <button onClick={() => handleViewFile(app.cv_file_path)} className="flex items-center gap-1 font-bold uppercase" style={{ color: COLORS.amber }}>
+                      <Eye size={12} /> CV / Resume
+                    </button>
+                  )}
                 </div>
               )}
               <div className="flex items-center gap-3 mt-1 pt-1.5 flex-wrap" style={{ borderTop: `1px solid ${COLORS.line}` }}>
@@ -141,7 +149,7 @@ export default function HRPage() {
                     <button onClick={() => setConfirmDeleteFor(null)} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Cancel</button>
                   </span>
                 ) : (
-                  <button onClick={() => setConfirmDeleteFor(app.id)} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Remove</button>
+                  <button onClick={() => setConfirmDeleteFor(app.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={13} /></button>
                 )}
               </div>
             </div>

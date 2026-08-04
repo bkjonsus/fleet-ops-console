@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
@@ -244,9 +244,9 @@ function AccountingDocumentsPanel({ canEdit }) {
                 </div>
                 <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{doc.file_name}</div>
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => handleView(doc)} className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>View</button>
-                {canEdit && <button onClick={() => docs.deleteDocument(doc)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+              <div className="flex items-center gap-2.5">
+                <button onClick={() => handleView(doc)} title="View" style={{ color: COLORS.amber }}><Eye size={14} /></button>
+                {canEdit && <button onClick={() => docs.deleteDocument(doc)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
               </div>
             </div>
           ))}
@@ -657,8 +657,8 @@ function InvoicesPanel({ table, loads, currentUser, setViewingInvoiceId, canEdit
                   <Pill color={statusColor(i.status)}>{i.status}</Pill>
                 )}
                 <button onClick={() => setViewingInvoiceId(i.id)} style={{ color: COLORS.amber }} className="hover:opacity-70" title="View / Print"><Printer size={13} /></button>
-                {canEdit && <button onClick={() => startEdit(i)} style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
-                {canEdit && <button onClick={() => remove(i.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+                {canEdit && <button onClick={() => startEdit(i)} title="Edit" style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
+                {canEdit && <button onClick={() => remove(i.id)} title="Remove" style={{ color: COLORS.red }} className="hover:opacity-70"><Trash2 size={13} /></button>}
               </div>
             </div>
           </div>
@@ -818,8 +818,8 @@ function ExpensesPanel({ table, loads, drivers, currentUser, canEdit }) {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-sm font-bold" style={{ color: COLORS.red }}>{money(e.amount)}</span>
               <div className="flex items-center gap-2">
-                {canEdit && <button onClick={() => startEdit(e)} style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
-                {canEdit && <button onClick={() => remove(e.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+                {canEdit && <button onClick={() => startEdit(e)} title="Edit" style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
+                {canEdit && <button onClick={() => remove(e.id)} title="Remove" style={{ color: COLORS.red }} className="hover:opacity-70"><Trash2 size={13} /></button>}
               </div>
             </div>
           </div>
@@ -1022,11 +1022,9 @@ function StatementsPanel({ table, loads, drivers, canEdit, setViewingStatementId
               <div className="text-xs mt-1" style={{ color: COLORS.muted }}>{formatDate(s.period_start)} → {formatDate(s.period_end)} · Net {money(s.net)}</div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setViewingStatementId(s.id)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ border: `1px solid ${COLORS.amber}`, color: COLORS.amber }}>
-                <Printer size={13} /> View / Print
-              </button>
-              {canEdit && <button onClick={() => startEdit(s)} style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
-              {canEdit && <button onClick={() => remove(s.id)} style={{ color: COLORS.muted }} className="text-xs hover:opacity-70">Remove</button>}
+              <button onClick={() => setViewingStatementId(s.id)} title="View / Print" style={{ color: COLORS.amber }} className="hover:opacity-70"><Printer size={16} /></button>
+              {canEdit && <button onClick={() => startEdit(s)} title="Edit" style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
+              {canEdit && <button onClick={() => remove(s.id)} title="Remove" style={{ color: COLORS.red }} className="hover:opacity-70"><Trash2 size={13} /></button>}
             </div>
           </div>
         ))}

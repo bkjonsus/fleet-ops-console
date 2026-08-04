@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon } from "lucide-react";
+import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon, Send } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 
 export const COLORS = {
@@ -310,6 +310,52 @@ export function HasDocsBadge({ documents, category, linkedTo }) {
     <span title="Documents attached" className="flex items-center justify-center rounded-full" style={{ width: 18, height: 18, background: COLORS.surfaceAlt, border: `1px solid ${COLORS.amber}`, color: COLORS.amber, flexShrink: 0 }}>
       <Paperclip size={10} />
     </span>
+  );
+}
+
+// A real back-and-forth chat thread. mySender is "driver" or "dispatch" — whichever
+// side is rendering it — so bubbles align correctly and the reply gets tagged right.
+export function MessageThread({ messages, onSend, mySender, placeholder }) {
+  const [text, setText] = useState("");
+  function send() {
+    if (!text.trim()) return;
+    onSend(text);
+    setText("");
+  }
+  return (
+    <div>
+      <div style={{ maxHeight: 220, overflowY: "auto" }} className="flex flex-col gap-1.5 mb-2">
+        {(!messages || messages.length === 0) && (
+          <div className="text-[11px]" style={{ color: COLORS.muted }}>No messages yet.</div>
+        )}
+        {(messages || []).map((m) => (
+          <div key={m.id} className="flex" style={{ justifyContent: m.sender === mySender ? "flex-end" : "flex-start" }}>
+            <div
+              className="px-2.5 py-1.5 rounded text-[11px]"
+              style={{
+                maxWidth: "80%",
+                background: m.sender === mySender ? COLORS.amber : COLORS.surfaceAlt,
+                color: m.sender === mySender ? COLORS.bg : COLORS.text,
+              }}
+            >
+              {m.message}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          style={{ ...inputStyle, flex: 1 }}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+          placeholder={placeholder || "Type a message…"}
+        />
+        <button onClick={send} title="Send" className="flex items-center justify-center rounded" style={{ width: 36, background: COLORS.amber, color: COLORS.bg }}>
+          <Send size={14} />
+        </button>
+      </div>
+    </div>
   );
 }
 

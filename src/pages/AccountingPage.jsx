@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown, Eye } from "lucide-react";
+import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown, Eye, Menu, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
@@ -9,6 +9,14 @@ import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money,
 
 const INVOICE_STATUSES = ["Draft", "Sent", "Paid", "Overdue"];
 const EXPENSE_CATEGORIES = ["Fuel", "Maintenance", "Insurance", "Payroll", "Tolls/Permits", "Other"];
+const ACCOUNTING_VIEWS = [
+  { key: "overview", label: "Overview" },
+  { key: "load board", label: "Load Board" },
+  { key: "invoices", label: "Invoices" },
+  { key: "expenses", label: "Expenses" },
+  { key: "statements", label: "Statements" },
+  { key: "documents", label: "Documents" },
+];
 const statusColor = (s) => {
   if (["Delivered", "Paid"].includes(s)) return COLORS.green;
   if (["Delayed", "Overdue"].includes(s)) return COLORS.red;
@@ -18,6 +26,7 @@ const statusColor = (s) => {
 
 export default function AccountingPage({ canEdit, canViewMoney }) {
   const [subTab, setSubTab] = useState("overview");
+  const [menuOpen, setMenuOpen] = useState(false);
   const { profile, activeCompanyId } = useAuth();
   const invoicesTable = useTable("invoices", "created_at", false, activeCompanyId);
   const expensesTable = useTable("expenses", "created_at", false, activeCompanyId);
@@ -66,22 +75,36 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1 mb-4">
-        {["overview", "load board", "invoices", "expenses", "statements", "documents"].map((k) => (
-          <button
-            key={k}
-            onClick={() => setSubTab(k)}
-            className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded"
-            style={{
-              background: subTab === k ? COLORS.surfaceAlt : "transparent",
-              color: subTab === k ? COLORS.amber : COLORS.muted,
-              border: `1px solid ${subTab === k ? COLORS.amber : COLORS.line}`,
-            }}
-          >
-            {k}
-          </button>
-        ))}
+      <div className="flex items-center gap-3 mb-3">
+        <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+          <Menu size={22} />
+        </button>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Accounting</div>
+          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{subTab}</div>
+        </div>
       </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Accounting Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            {ACCOUNTING_VIEWS.map((v) => (
+              <button
+                key={v.key}
+                onClick={() => { setSubTab(v.key); setMenuOpen(false); }}
+                className="text-left px-3 py-2.5 text-xs font-bold uppercase"
+                style={{ color: subTab === v.key ? COLORS.amber : COLORS.text, borderBottom: `1px solid ${COLORS.line}`, background: subTab === v.key ? COLORS.surfaceAlt : "transparent" }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {subTab === "overview" && (
         <div>

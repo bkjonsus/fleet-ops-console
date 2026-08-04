@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Paperclip, Eye, Trash2, MoreVertical } from "lucide-react";
+import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 
 export const COLORS = {
@@ -103,6 +103,17 @@ export function docLabel(days) {
   if (days < 0) return `Expired ${Math.abs(days)}d ago`;
   if (days === 0) return "Expires today";
   return `Expires in ${days}d`;
+}
+
+function reviewStatusColor(s) {
+  if (s === "confirmed") return COLORS.green;
+  if (s === "rejected") return COLORS.red;
+  return COLORS.amber; // pending
+}
+function reviewStatusLabel(s) {
+  if (s === "confirmed") return "Confirmed";
+  if (s === "rejected") return "Rejected — please re-upload";
+  return "Pending review";
 }
 
 const CAN_EDIT_LOADS_ROLES = ["admin", "dispatch", "ops_viewer"];
@@ -235,7 +246,7 @@ export function shortLocation(loc) {
 
 // e.g. "WED JUL 29, 9:34 AM"
 export function formatDateTimeCompact(dateStr, timeStr) {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return "—";
   const d = new Date(dateStr + "T00:00:00");
   const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
   const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
@@ -303,8 +314,15 @@ export function HasDocsBadge({ documents, category, linkedTo }) {
 }
 
 // Full upload + list section for a given category/linkedTo (e.g. category="Driver",
-// linkedTo="J. Alvarez"). Reused across Fleet, Dispatch, and Accounting.
-export function DocumentsSection({ documents, category, linkedTo, docTypes, uploadDocument, deleteDocument, viewDocument, currentUser, canEdit, canDelete }) {
+// linkedTo="J. Alvarez"). Reused across Fleet, Dispatch, Accounting, and the Driver App.
+//
+// flagForReview: when true, a fresh upload is marked review_status="pending" instead
+// of confirmed automatically — use this where a DRIVER is uploading their own
+// compliance doc, so Fleet has to sign off on it before it counts as valid.
+//
+// canReview / confirmDocument / rejectDocument: when canReview is true, a pending
+// document shows Confirm/Reject icon buttons (Fleet reviewing a driver's upload).
+export function DocumentsSection({ documents, category, linkedTo, docTypes, uploadDocument, deleteDocument, viewDocument, currentUser, canEdit, canDelete, flagForReview, canReview, confirmDocument, rejectDocument }) {
   const [showUpload, setShowUpload] = useState(false);
   const [docType, setDocType] = useState(docTypes[0]);
   const [expiryDate, setExpiryDate] = useState("");
@@ -319,14 +337,20 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
     if (!file) { setLocalError("Choose a photo or PDF first."); return; }
     setLocalError("");
     setBusy(true);
-    const ok = await uploadDocument({ category, linkedTo, docType, issueDate: todayISO(), expiryDate, createdBy: currentUser }, file);
+    // If this replaces a document of the same type, remove the old record first —
+    // otherwise it lingers with a stale expiry/status alongside the new one.
+    const existing = myDocs.filter((d) => d.doc_type === docType);
+    for (const d of existing) {
+      await deleteDocument(d);
+    }
+    const ok = await uploadDocument({ category, linkedTo, docType, issueDate: todayISO(), expiryDate, createdBy: currentUser, reviewStatus: flagForReview ? "pending" : undefined }, file);
     setBusy(false);
     if (ok) {
       setFile(null);
       setExpiryDate("");
       setShowUpload(false);
     } else {
-      setLocalError("Upload failed \u2014 check the file size (max 15MB) and try again.");
+      setLocalError("Upload failed — check the file size (max 15MB) and try again.");
     }
   }
 
@@ -352,6 +376,11 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
       {showUpload && canEdit && (
         <div className="p-2 mb-2 rounded" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.line}` }}>
           {localError && <p className="text-[10px] mb-1" style={{ color: COLORS.red }}>{localError}</p>}
+          {flagForReview && (
+            <p className="text-[10px] mb-1" style={{ color: COLORS.amber }}>
+              This will need Fleet's review before it counts as confirmed on file.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2 items-end">
             <Field label="Type">
               <select style={{ ...inputStyle, fontSize: 11, padding: "4px 6px" }} value={docType} onChange={(e) => setDocType(e.target.value)}>
@@ -365,7 +394,7 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
               <input style={{ ...inputStyle, fontSize: 11, padding: "4px 6px" }} type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             </Field>
             <button onClick={upload} disabled={busy} className="px-2 py-1.5 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.green, color: "#08210F", opacity: busy ? 0.6 : 1 }}>
-              {busy ? "Uploading\u2026" : "Save"}
+              {busy ? "Uploading…" : "Save"}
             </button>
           </div>
         </div>
@@ -378,11 +407,18 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
           {myDocs.map((doc) => (
             <div key={doc.id} className="flex items-center justify-between text-[11px] flex-wrap gap-1" style={{ color: COLORS.text }}>
               <span>
-                {doc.doc_type}{doc.file_name ? ` \u2014 ${doc.file_name}` : ""}
+                {doc.doc_type}{doc.file_name ? ` — ${doc.file_name}` : ""}
                 {doc.expiry_date && <Pill color={docColor(daysUntil(doc.expiry_date))}> {docLabel(daysUntil(doc.expiry_date))}</Pill>}
+                {doc.review_status && <Pill color={reviewStatusColor(doc.review_status)}> {reviewStatusLabel(doc.review_status)}</Pill>}
               </span>
               <span className="flex items-center gap-2.5">
                 <button onClick={() => handleView(doc)} title="View / Print / Download" style={{ color: COLORS.amber }}><Eye size={14} /></button>
+                {canReview && doc.review_status === "pending" && (
+                  <>
+                    <button onClick={() => confirmDocument(doc)} title="Confirm" style={{ color: COLORS.green }}><Check size={14} /></button>
+                    <button onClick={() => rejectDocument(doc)} title="Reject — ask for re-upload" style={{ color: COLORS.red }}><XIcon size={14} /></button>
+                  </>
+                )}
                 {allowDelete && <button onClick={() => deleteDocument(doc)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
               </span>
             </div>

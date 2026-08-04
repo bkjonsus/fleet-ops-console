@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Pencil, Building2 } from "lucide-react";
+import { Plus, Pencil, Building2, Trash2 } from "lucide-react";
 import { useTable } from "../useTable";
 import { COLORS, inputStyle, Field, Panel, Pill, EmptyState } from "../ui";
 
@@ -114,7 +114,7 @@ export default function CompaniesPage({ onCompanyCreated }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button onClick={() => startEdit(c)} style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>
+                <button onClick={() => startEdit(c)} title="Edit" style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>
                 {confirmDeleteFor === c.id ? (
                   <span className="flex items-center gap-2">
                     <span className="text-[11px]" style={{ color: COLORS.red }}>Delete permanently?</span>
@@ -122,7 +122,7 @@ export default function CompaniesPage({ onCompanyCreated }) {
                     <button onClick={() => setConfirmDeleteFor(null)} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Cancel</button>
                   </span>
                 ) : (
-                  <button onClick={() => setConfirmDeleteFor(c.id)} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Delete</button>
+                  <button onClick={() => setConfirmDeleteFor(c.id)} title="Delete" style={{ color: COLORS.red }}><Trash2 size={13} /></button>
                 )}
               </div>
             </div>

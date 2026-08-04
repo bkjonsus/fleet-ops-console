@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Menu, X } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTable } from "../useTable";
@@ -16,27 +16,51 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
+  const [menuOpen, setMenuOpen] = useState(false);
   const { profile, activeCompanyId } = useAuth();
   const docs = useDocuments(activeCompanyId);
   const currentUser = profile?.full_name || profile?.role || "Unknown";
+
+  const FLEET_VIEWS = [
+    { key: "drivers", label: "Drivers" },
+    { key: "trucks", label: "Trucks" },
+    { key: "trailers", label: "Trailers" },
+    { key: "live map", label: "Live Map" },
+  ];
+
   return (
     <div>
-      <div className="flex flex-wrap gap-1 mb-4">
-        {["drivers", "trucks", "trailers", "live map"].map((k) => (
-          <button
-            key={k}
-            onClick={() => setSubTab(k)}
-            className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide rounded"
-            style={{
-              background: subTab === k ? COLORS.surfaceAlt : "transparent",
-              color: subTab === k ? COLORS.amber : COLORS.muted,
-              border: `1px solid ${subTab === k ? COLORS.amber : COLORS.line}`,
-            }}
-          >
-            {k}
-          </button>
-        ))}
+      <div className="flex items-center gap-3 mb-3">
+        <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+          <Menu size={22} />
+        </button>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Fleet</div>
+          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{subTab}</div>
+        </div>
       </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Fleet Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            {FLEET_VIEWS.map((v) => (
+              <button
+                key={v.key}
+                onClick={() => { setSubTab(v.key); setMenuOpen(false); }}
+                className="text-left px-3 py-2.5 text-xs font-bold uppercase"
+                style={{ color: subTab === v.key ? COLORS.amber : COLORS.text, borderBottom: `1px solid ${COLORS.line}`, background: subTab === v.key ? COLORS.surfaceAlt : "transparent" }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {subTab === "drivers" && <DriversPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}
       {subTab === "trucks" && <TrucksPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}
       {subTab === "trailers" && <TrailersPanel canEdit={canEdit} docs={docs} currentUser={currentUser} companyId={activeCompanyId} />}

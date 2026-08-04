@@ -62,11 +62,16 @@ function DriversPanel({ canEdit, docs, currentUser, companyId }) {
     if (!error) { setForm(blank()); setShowForm(false); }
   }
 
+  const pendingReviewCount = (docs.documents || []).filter((doc) => doc.category === "Driver" && doc.review_status === "pending").length;
+
   return (
     <div>
       <ErrorBanner message={error} />
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>Drivers ({drivers.length})</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: COLORS.text }}>
+          Drivers ({drivers.length})
+          {pendingReviewCount > 0 && <span style={{ color: COLORS.amber }}> · {pendingReviewCount} doc{pendingReviewCount === 1 ? "" : "s"} awaiting review</span>}
+        </h2>
         {canEdit && (
           <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold uppercase rounded" style={{ background: COLORS.amber, color: COLORS.bg }}>
             <Plus size={14} /> New Driver
@@ -115,6 +120,7 @@ function DriversPanel({ canEdit, docs, currentUser, companyId }) {
       <div className="flex flex-col gap-2">
         {drivers.map((d) => {
           const cdlDays = d.cdl_expiry_date ? daysUntil(d.cdl_expiry_date) : null;
+          const pendingReview = (docs.documents || []).some((doc) => doc.category === "Driver" && doc.linked_to === d.name && doc.review_status === "pending");
           return (
             <div key={d.id} className="p-3 rounded flex flex-col gap-1" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -124,6 +130,7 @@ function DriversPanel({ canEdit, docs, currentUser, companyId }) {
                   <Pill color={d.status === "Active" ? COLORS.green : COLORS.muted}>{d.status}</Pill>
                   <Pill color={COLORS.amber}>{d.contract_type}</Pill>
                   {d.cdl_expiry_date && <Pill color={returnColor(cdlDays)}>CDL {returnLabel(cdlDays)}</Pill>}
+                  {pendingReview && <Pill color={COLORS.amber}>Doc awaiting review</Pill>}
                 </div>
                 {canEdit && <button onClick={() => remove(d.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
               </div>
@@ -148,6 +155,9 @@ function DriversPanel({ canEdit, docs, currentUser, companyId }) {
                     viewDocument={docs.viewDocument}
                     currentUser={currentUser}
                     canEdit={canEdit}
+                    canReview={canEdit}
+                    confirmDocument={docs.confirmDocument}
+                    rejectDocument={docs.rejectDocument}
                   />
                 </div>
               )}

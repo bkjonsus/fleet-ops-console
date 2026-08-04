@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Menu, X } from "lucide-react";
+import { Plus, Trash2, Menu, X, AlertTriangle } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
-import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert, DocumentsSection, HasDocsBadge } from "../ui";
+import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert, DocumentsSection, HasDocsBadge, docColor, docLabel } from "../ui";
 
 const CONTRACT_TYPES = ["Company - Per Mile", "Company - Percentage", "Owner Operator", "Lease Driver (Truck & Trailer)"];
 const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
@@ -17,8 +17,10 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 export default function FleetPage({ canEdit }) {
   const [subTab, setSubTab] = useState("drivers");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   const { profile, activeCompanyId } = useAuth();
   const docs = useDocuments(activeCompanyId);
+  const { rows: alertDrivers } = useTable("drivers", "name", true, activeCompanyId);
   const currentUser = profile?.full_name || profile?.role || "Unknown";
 
   const FLEET_VIEWS = [
@@ -28,15 +30,77 @@ export default function FleetPage({ canEdit }) {
     { key: "live map", label: "Live Map" },
   ];
 
+  // Expiring or expired within 30 days, across driver CDLs (the typed-in field, unless
+  // an actual CDL document exists — that becomes the source of truth once uploaded)
+  // plus every truck/trailer document with an expiry date. Combined into one bell so
+  // Fleet doesn't have to check three separate places for what needs attention.
+  const expiringItems = [];
+  alertDrivers.forEach((d) => {
+    const hasCdlDoc = (docs.documents || []).some((doc) => doc.category === "Driver" && doc.linked_to === d.name && doc.doc_type === "CDL");
+    if (d.cdl_expiry_date && !hasCdlDoc) {
+      const days = daysUntil(d.cdl_expiry_date);
+      if (days !== null && days <= 30) expiringItems.push({ id: `cdl-${d.id}`, label: `${d.name} — CDL`, days, target: "drivers" });
+    }
+  });
+  (docs.documents || []).forEach((doc) => {
+    if (!doc.expiry_date) return;
+    const days = daysUntil(doc.expiry_date);
+    if (days === null || days > 30) return;
+    if (doc.category === "Driver") {
+      expiringItems.push({ id: `doc-${doc.id}`, label: `${doc.linked_to} — ${doc.doc_type}`, days, target: "drivers" });
+    } else if (doc.category === "Truck") {
+      expiringItems.push({ id: `doc-${doc.id}`, label: `Truck ${doc.linked_to} — ${doc.doc_type}`, days, target: "trucks" });
+    } else if (doc.category === "Trailer") {
+      expiringItems.push({ id: `doc-${doc.id}`, label: `Trailer ${doc.linked_to} — ${doc.doc_type}`, days, target: "trailers" });
+    }
+  });
+  expiringItems.sort((a, b) => a.days - b.days);
+
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
-        <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
-          <Menu size={22} />
-        </button>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Fleet</div>
-          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{subTab}</div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+            <Menu size={22} />
+          </button>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Fleet</div>
+            <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{subTab}</div>
+          </div>
+        </div>
+        <div className="relative">
+          <button onClick={() => setBellOpen(!bellOpen)} title="Expiring or expired" className="relative" style={{ color: expiringItems.length > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
+            <AlertTriangle size={20} />
+            {expiringItems.length > 0 && (
+              <span className="flex items-center justify-center rounded-full" style={{ position: "absolute", top: -6, right: -8, minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
+                {expiringItems.length}
+              </span>
+            )}
+          </button>
+          {bellOpen && (
+            <>
+              <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setBellOpen(false)} />
+              <div className="absolute right-0 mt-2 rounded overflow-hidden" style={{ width: 280, maxWidth: "85vw", maxHeight: 340, overflowY: "auto", background: COLORS.surface, border: `1px solid ${COLORS.red}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.red, borderBottom: `1px solid ${COLORS.line}` }}>
+                  Expiring or Expired ({expiringItems.length})
+                </div>
+                {expiringItems.length === 0 && (
+                  <div className="px-3 py-4 text-xs text-center" style={{ color: COLORS.muted }}>Nothing expiring in the next 30 days.</div>
+                )}
+                {expiringItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => { setSubTab(item.target); setBellOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                    style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                  >
+                    <span>{item.label}</span>
+                    <Pill color={docColor(item.days)}>{docLabel(item.days)}</Pill>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

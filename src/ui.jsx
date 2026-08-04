@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Eye, Trash2, MoreVertical } from "lucide-react";
 import { useDocuments } from "./useDocuments";
 
 export const COLORS = {
@@ -165,6 +165,39 @@ export function ErrorBanner({ message }) {
   return (
     <div className="mx-4 mt-3 px-3 py-2 text-xs rounded" style={{ background: "#3A1E20", color: COLORS.red }}>
       {message}
+    </div>
+  );
+}
+
+// Compact icon-only actions menu — a single "more" icon that opens a small row of
+// icon buttons, instead of several separate text links/buttons crowding a row.
+// Only use this for 2+ actions on the same row; for a single action, just use a
+// plain icon button directly (a dropdown for one option is unnecessary friction).
+export function ActionMenu({ actions }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
+      <button onClick={() => setOpen(!open)} title="More actions" style={{ color: COLORS.muted }} className="flex items-center justify-center">
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-0.5 rounded overflow-hidden flex items-center" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+            {actions.map((a, i) => (
+              <button
+                key={i}
+                onClick={() => { a.onClick(); setOpen(false); }}
+                title={a.label}
+                className="flex items-center justify-center"
+                style={{ color: a.color || COLORS.text, width: 34, height: 34, borderRight: i < actions.length - 1 ? `1px solid ${COLORS.line}` : "none" }}
+              >
+                <a.icon size={15} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -348,9 +381,9 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
                 {doc.doc_type}{doc.file_name ? ` \u2014 ${doc.file_name}` : ""}
                 {doc.expiry_date && <Pill color={docColor(daysUntil(doc.expiry_date))}> {docLabel(daysUntil(doc.expiry_date))}</Pill>}
               </span>
-              <span className="flex items-center gap-2">
-                <button onClick={() => handleView(doc)} className="font-bold uppercase" style={{ color: COLORS.amber }}>View</button>
-                {allowDelete && <button onClick={() => deleteDocument(doc)} style={{ color: COLORS.muted }}>Remove</button>}
+              <span className="flex items-center gap-2.5">
+                <button onClick={() => handleView(doc)} title="View / Print / Download" style={{ color: COLORS.amber }}><Eye size={14} /></button>
+                {allowDelete && <button onClick={() => deleteDocument(doc)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
               </span>
             </div>
           ))}
@@ -359,4 +392,3 @@ export function DocumentsSection({ documents, category, linkedTo, docTypes, uplo
     </div>
   );
 }
-

@@ -76,7 +76,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
         </div>
       )}
 
-      {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} myName={myName} />}
+      {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} myName={myName} hasActiveLoad={activeLoads.length > 0} />}
       {myDriverRecord && !isPreview && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} />}
       {myDriverRecord && <MyDocumentsCard driver={myDriverRecord} docs={docs} currentUser={myName} />}
 
@@ -108,12 +108,12 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
 // (with an unread dot) all inline — tap the row to expand the full editable form,
 // tap the message icon separately to open the conversation. Matches the original
 // preview design instead of a separate always-open form + a floating chat bubble.
-function AvailabilityCard({ driver, updateDriver, companyId, myName }) {
+function AvailabilityCard({ driver, updateDriver, companyId, myName, hasActiveLoad }) {
   const [note, setNote] = useState(driver.board_note || "");
   const [readyDate, setReadyDate] = useState(driver.ready_date || "");
   const [readyTime, setReadyTime] = useState(driver.ready_time || "");
   const [readyCity, setReadyCity] = useState(driver.ready_city || "");
-  const status = driver.board_status || "Ready";
+  const status = hasActiveLoad ? "In Route" : (driver.board_status || "Ready");
   const [expanded, setExpanded] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
   const { messages, sendMessage, markThreadRead, editMessage, deleteMessages } = useDriverMessages(driver.id, companyId);
@@ -159,13 +159,20 @@ function AvailabilityCard({ driver, updateDriver, companyId, myName }) {
       {expanded && (
         <div className="mt-3 pt-3 flex flex-col gap-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
           <Field label="Status">
-            <select
-              value={status}
-              onChange={(e) => updateDriver(driver.id, { board_status: e.target.value })}
-              style={{ ...inputStyle, color: driverBoardStatusColor(status), borderColor: driverBoardStatusColor(status) }}
-            >
-              {DRIVER_BOARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            {hasActiveLoad ? (
+              <div className="flex items-center gap-2">
+                <Pill color={driverBoardStatusColor(status)}>{status}</Pill>
+                <span className="text-[10px]" style={{ color: COLORS.muted }}>Locked while a load is active</span>
+              </div>
+            ) : (
+              <select
+                value={status}
+                onChange={(e) => updateDriver(driver.id, { board_status: e.target.value })}
+                style={{ ...inputStyle, color: driverBoardStatusColor(status), borderColor: driverBoardStatusColor(status) }}
+              >
+                {DRIVER_BOARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
           </Field>
           <div className="flex gap-2 flex-wrap">
             <Field label="Ready Date">

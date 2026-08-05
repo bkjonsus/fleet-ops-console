@@ -64,6 +64,17 @@ export default function FleetPage({ canEdit }) {
   });
   expiringItems.sort((a, b) => a.days - b.days);
 
+  // Documents awaiting Fleet's review (driver uploads) -- shown ahead of the
+  // expiry list since these need a decision, not just eventual attention.
+  const pendingReviewItems = (docs.documents || [])
+    .filter((doc) => doc.review_status === "pending")
+    .map((doc) => ({
+      id: `review-${doc.id}`,
+      label: `${doc.linked_to} — ${doc.doc_type}`,
+      target: doc.category === "Truck" ? "trucks" : doc.category === "Trailer" ? "trailers" : "drivers",
+    }));
+  const totalAlertCount = expiringItems.length + pendingReviewItems.length;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -77,11 +88,11 @@ export default function FleetPage({ canEdit }) {
           </div>
         </div>
         <div className="relative">
-          <button onClick={() => setBellOpen(!bellOpen)} title="Expiring or expired" className="relative" style={{ color: expiringItems.length > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
+          <button onClick={() => setBellOpen(!bellOpen)} title="Needs attention" className="relative" style={{ color: totalAlertCount > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
             <AlertTriangle size={20} />
-            {expiringItems.length > 0 && (
+            {totalAlertCount > 0 && (
               <span className="flex items-center justify-center rounded-full" style={{ position: "absolute", top: -6, right: -8, minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
-                {expiringItems.length}
+                {totalAlertCount}
               </span>
             )}
           </button>
@@ -89,6 +100,24 @@ export default function FleetPage({ canEdit }) {
             <>
               <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setBellOpen(false)} />
               <div className="absolute right-0 mt-2 rounded overflow-hidden" style={{ width: 280, maxWidth: "85vw", maxHeight: 340, overflowY: "auto", background: COLORS.surface, border: `1px solid ${COLORS.red}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                {pendingReviewItems.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.amber, borderBottom: `1px solid ${COLORS.line}` }}>
+                      Needs Review ({pendingReviewItems.length})
+                    </div>
+                    {pendingReviewItems.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { setSubTab(item.target); setBellOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                        style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                      >
+                        <span>{item.label}</span>
+                        <Pill color={COLORS.amber}>Pending</Pill>
+                      </button>
+                    ))}
+                  </>
+                )}
                 <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.red, borderBottom: `1px solid ${COLORS.line}` }}>
                   Expiring or Expired ({expiringItems.length})
                 </div>

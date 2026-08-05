@@ -10,7 +10,7 @@ import {
   todayISO, sanitizeForInsert, TONU_STATUSES, tonuStatusColor, getStops, shortLocation,
   formatDateTimeCompact, ratePerMile, generateCode, useIsMobile, StopCircle,
   DRIVER_BOARD_STATUSES, driverBoardStatusColor, uid, canEditLoadInfo, IN_TRANSIT_STATUSES, HISTORY_STATUSES,
-  DocumentsSection, HasDocsBadge, MessageThread,
+  DocumentsSection, HasDocsBadge, MessageThread, MessageModal,
 } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled", "TONU"];
@@ -773,7 +773,7 @@ function ReadinessEditor({ driver, onSave, onCancel }) {
 // Compact by default: a small icon with an unread badge, expanding to the full
 // thread only when tapped, instead of always showing the whole conversation inline.
 function DriverMessageThread({ driver, companyId, currentUser }) {
-  const { messages, sendMessage, markThreadRead } = useDriverMessages(driver.id, companyId);
+  const { messages, sendMessage, markThreadRead, editMessage, deleteMessages } = useDriverMessages(driver.id, companyId);
   const [open, setOpen] = useState(false);
   const unreadCount = messages.filter((m) => m.sender === "driver" && !m.read).length;
 
@@ -792,13 +792,15 @@ function DriverMessageThread({ driver, companyId, currentUser }) {
         )}
       </button>
       {open && (
-        <div className="mt-2">
+        <MessageModal onClose={() => setOpen(false)}>
           <MessageThread
             messages={messages}
             onSend={(text) => sendMessage("dispatch", currentUser, text)}
+            onEdit={editMessage}
+            onDeleteMany={deleteMessages}
             mySender="dispatch"
           />
-        </div>
+        </MessageModal>
       )}
     </div>
   );

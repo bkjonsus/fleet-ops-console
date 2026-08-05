@@ -386,7 +386,7 @@ export function MessageThread({ messages, onSend, onEdit, onDeleteMany, mySender
         {(!messages || messages.length === 0) && (
           <div className="text-[11px]" style={{ color: COLORS.muted }}>No messages yet.</div>
         )}
-        {[...(messages || [])].reverse().map((m) => {
+        {[...(messages || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)).reverse().map((m) => {
           const isMine = m.sender === mySender;
           const isSelected = selectedIds.includes(m.id);
           return (

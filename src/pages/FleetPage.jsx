@@ -12,6 +12,14 @@ const TRUCK_OWNERSHIP = ["Company Owned", "Rental", "Owner Operator"];
 const TRAILER_OWNERSHIP = ["Company Owned", "Short-Term Rental"];
 const TRAILER_TYPES = ["Dry Van", "Reefer", "Flatbed", "Step Deck", "Other"];
 const SPEED_ALERT_MPH = 80; // fixed threshold, not tied to any road's actual posted limit
+
+// Nearest-expiring document for a given category/linkedTo, or null if none have
+// an expiry date set. Used to show a quick-glance pill on collapsed Truck/Trailer rows.
+function nearestExpiringDoc(documents, category, linkedTo) {
+  const matches = (documents || []).filter((d) => d.category === category && d.linked_to === linkedTo && d.expiry_date);
+  if (matches.length === 0) return null;
+  return matches.reduce((soonest, d) => (new Date(d.expiry_date) < new Date(soonest.expiry_date) ? d : soonest));
+}
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 export default function FleetPage({ canEdit }) {
@@ -332,6 +340,10 @@ function TrucksPanel({ canEdit, docs, currentUser, companyId }) {
                 <HasDocsBadge documents={docs.documents} category="Truck" linkedTo={t.unit_number} />
                 <Pill color={t.ownership === "Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
+                {(() => {
+                  const nearest = nearestExpiringDoc(docs.documents, "Truck", t.unit_number);
+                  return nearest ? <Pill color={docColor(daysUntil(nearest.expiry_date))}>{nearest.doc_type}: {docLabel(daysUntil(nearest.expiry_date))}</Pill> : null;
+                })()}
               </div>
               {canEdit && <button onClick={() => remove(t.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
             </div>
@@ -447,6 +459,10 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
                 <Pill color={COLORS.muted}>{t.trailer_type}</Pill>
                 <Pill color={t.ownership === "Short-Term Rental" ? COLORS.amber : COLORS.muted}>{t.ownership}</Pill>
                 {t.ownership === "Short-Term Rental" && t.return_date && <Pill color={returnColor(daysUntil(t.return_date))}>{returnLabel(daysUntil(t.return_date))}</Pill>}
+                {(() => {
+                  const nearest = nearestExpiringDoc(docs.documents, "Trailer", t.trailer_number);
+                  return nearest ? <Pill color={docColor(daysUntil(nearest.expiry_date))}>{nearest.doc_type}: {docLabel(daysUntil(nearest.expiry_date))}</Pill> : null;
+                })()}
               </div>
               {canEdit && <button onClick={() => remove(t.id)} title="Remove" style={{ color: COLORS.red }}><Trash2 size={14} /></button>}
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown, Eye, Menu, X } from "lucide-react";
+import { Plus, Printer, Pencil, ArrowLeft, Trash2, Download, Filter as FilterIcon, ChevronRight, ChevronDown, Eye, Menu, X, AlertTriangle, Check } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
@@ -26,10 +26,14 @@ const statusColor = (s) => {
 
 export default function AccountingPage({ canEdit, canViewMoney }) {
   const [subTab, setSubTab] = useState("overview");
+  const [bellOpen, setBellOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { profile, activeCompanyId } = useAuth();
   const invoicesTable = useTable("invoices", "created_at", false, activeCompanyId);
   const expensesTable = useTable("expenses", "created_at", false, activeCompanyId);
+  const overdueInvoices = invoicesTable.rows.filter((i) => i.status === "Overdue");
+  const unreviewedExpenses = expensesTable.rows.filter((e) => !e.reviewed);
+  const totalAlertCount = overdueInvoices.length + unreviewedExpenses.length;
   const statementsTable = useTable("statements", "created_at", false, activeCompanyId);
   const { rows: loads, update: updateLoad } = useTable("loads", "created_at", false, activeCompanyId);
   const { rows: drivers } = useTable("drivers", "name", true, activeCompanyId);
@@ -75,7 +79,9 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
         <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
           <Menu size={22} />
         </button>
@@ -83,7 +89,121 @@ export default function AccountingPage({ canEdit, canViewMoney }) {
           <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Accounting</div>
           <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{subTab}</div>
         </div>
-      </div>
+          </div>
+        <div className="relative">
+          <button onClick={() => setBellOpen(!bellOpen)} title="Needs attention" className="relative" style={{ color: totalAlertCount > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
+            <AlertTriangle size={20} />
+            {totalAlertCount > 0 && (
+              <span className="flex items-center justify-center rounded-full" style={{ position: "absolute", top: -6, right: -8, minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
+                {totalAlertCount}
+              </span>
+            )}
+          </button>
+          {bellOpen && (
+            <>
+              <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setBellOpen(false)} />
+              <div className="absolute right-0 mt-2 rounded overflow-hidden" style={{ width: 280, maxWidth: "85vw", maxHeight: 340, overflowY: "auto", background: COLORS.surface, border: `1px solid ${COLORS.red}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                {overdueInvoices.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.red, borderBottom: `1px solid ${COLORS.line}` }}>
+                      Overdue Invoices ({overdueInvoices.length})
+                    </div>
+                    {overdueInvoices.map((inv) => (
+                      <button
+                        key={inv.id}
+                        onClick={() => { setSubTab("invoices"); setBellOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                        style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                      >
+                        <span>{inv.invoice_number} — {inv.customer}</span>
+                        <Pill color={COLORS.red}>{money(inv.amount)}</Pill>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {unreviewedExpenses.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.amber, borderBottom: `1px solid ${COLORS.line}` }}>
+                      Unreviewed Expenses ({unreviewedExpenses.length})
+                    </div>
+                    {unreviewedExpenses.map((exp) => (
+                      <button
+                        key={exp.id}
+                        onClick={() => { setSubTab("expenses"); setBellOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                        style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                      >
+                        <span>{exp.description || "(no description)"} — {money(exp.amount)}</span>
+                        {(!exp.description || !exp.load_number) && <Pill color={COLORS.red}>Incomplete</Pill>}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {totalAlertCount === 0 && (
+                  <div className="px-3 py-4 text-xs text-center" style={{ color: COLORS.muted }}>Nothing needs attention right now.</div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        </div>
+        <div className="relative">
+          <button onClick={() => setBellOpen(!bellOpen)} title="Needs attention" className="relative" style={{ color: totalAlertCount > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
+            <AlertTriangle size={20} />
+            {totalAlertCount > 0 && (
+              <span className="flex items-center justify-center rounded-full" style={{ position: "absolute", top: -6, right: -8, minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
+                {totalAlertCount}
+              </span>
+            )}
+          </button>
+          {bellOpen && (
+            <>
+              <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setBellOpen(false)} />
+              <div className="absolute right-0 mt-2 rounded overflow-hidden" style={{ width: 280, maxWidth: "85vw", maxHeight: 340, overflowY: "auto", background: COLORS.surface, border: `1px solid ${COLORS.red}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                {overdueInvoices.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.red, borderBottom: `1px solid ${COLORS.line}` }}>
+                      Overdue Invoices ({overdueInvoices.length})
+                    </div>
+                    {overdueInvoices.map((inv) => (
+                      <button
+                        key={inv.id}
+                        onClick={() => { setSubTab("invoices"); setBellOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                        style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                      >
+                        <span>{inv.invoice_number} — {inv.customer}</span>
+                        <Pill color={COLORS.red}>{money(inv.amount)}</Pill>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {unreviewedExpenses.length > 0 && (
+                  <>
+                    <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.amber, borderBottom: `1px solid ${COLORS.line}` }}>
+                      Unreviewed Expenses ({unreviewedExpenses.length})
+                    </div>
+                    {unreviewedExpenses.map((exp) => (
+                      <button
+                        key={exp.id}
+                        onClick={() => { setSubTab("expenses"); setBellOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2"
+                        style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                      >
+                        <span>{exp.description || "(no description)"} — {money(exp.amount)}</span>
+                        {(!exp.description || !exp.load_number) && <Pill color={COLORS.red}>Incomplete</Pill>}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {totalAlertCount === 0 && (
+                  <div className="px-3 py-4 text-xs text-center" style={{ color: COLORS.muted }}>Nothing needs attention right now.</div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        </div>
 
       {menuOpen && (
         <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
@@ -841,6 +961,11 @@ function ExpensesPanel({ table, loads, drivers, currentUser, canEdit }) {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-mono text-sm font-bold" style={{ color: COLORS.red }}>{money(e.amount)}</span>
               <div className="flex items-center gap-2">
+                {canEdit && (
+                  <button onClick={() => update(e.id, { reviewed: !e.reviewed })} title={e.reviewed ? "Reviewed" : "Mark as reviewed"} style={{ color: e.reviewed ? COLORS.green : COLORS.muted }} className="hover:opacity-70">
+                    <Check size={13} />
+                  </button>
+                )}
                 {canEdit && <button onClick={() => startEdit(e)} title="Edit" style={{ color: COLORS.amber }} className="hover:opacity-70"><Pencil size={13} /></button>}
                 {canEdit && <button onClick={() => remove(e.id)} title="Remove" style={{ color: COLORS.red }} className="hover:opacity-70"><Trash2 size={13} /></button>}
               </div>

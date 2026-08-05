@@ -843,12 +843,14 @@ function DriverBoardPanel({ loads, drivers, canEdit, companyId, currentUser }) {
       {rows.length === 0 && <EmptyState text="No active drivers on the roster yet." />}
       <div className="flex flex-col gap-1.5">
         {rows.map(({ driver: d, activeLoad }) => {
-          const boardStatus = d.board_status || (activeLoad ? "In Route" : "Ready");
+          const boardStatus = activeLoad ? "In Route" : (d.board_status || "Ready");
           return (
             <div key={d.id} className="p-2 rounded flex flex-wrap items-center gap-2" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
               <div className="flex items-center gap-2 flex-wrap" style={{ flex: "1 1 260px" }}>
                 <span className="text-xs font-bold whitespace-nowrap" style={{ color: COLORS.text }}>{d.name}</span>
-                {canEdit ? (
+                {activeLoad ? (
+                  <Pill color={driverBoardStatusColor(boardStatus)} title="Locked while a load is active">{boardStatus}</Pill>
+                ) : canEdit ? (
                   <select
                     value={boardStatus}
                     onChange={(e) => updateDriver(d.id, { board_status: e.target.value })}

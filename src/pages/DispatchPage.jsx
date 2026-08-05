@@ -263,7 +263,7 @@ export default function DispatchPage({ canEdit, role }) {
       )}
 
       {dispatchView === "driver board" ? (
-        <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} companyId={activeCompanyId} />
+        <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} companyId={activeCompanyId} currentUser={currentUserLabel} />
       ) : (
         <>
           <div className="flex items-center justify-between mb-2 gap-2">
@@ -770,12 +770,12 @@ function ReadinessEditor({ driver, onSave, onCancel }) {
 
 // Real two-way thread with the driver — same component and data source the
 // Driver App uses, so both sides see and reply to the exact same conversation.
-function DriverMessageThread({ driver, companyId }) {
-  const { messages, sendMessage } = useDriverMessages(companyId, driver.name);
+function DriverMessageThread({ driver, companyId, currentUser }) {
+  const { messages, sendMessage } = useDriverMessages(driver.id, companyId);
   return (
     <MessageThread
       messages={messages}
-      onSend={(text) => sendMessage(text, "dispatch")}
+      onSend={(text) => sendMessage("dispatch", currentUser, text)}
       mySender="dispatch"
     />
   );
@@ -794,7 +794,7 @@ function DispatchNoteField({ driver, updateDriver }) {
   );
 }
 
-function DriverBoardPanel({ loads, drivers, canEdit, companyId }) {
+function DriverBoardPanel({ loads, drivers, canEdit, companyId, currentUser }) {
   const { update: updateDriver } = useTable("drivers", "name", true);
   const [editingReady, setEditingReady] = useState(null);
   const activeStatuses = ["Assigned", "En Route", "At Pickup", "In Transit"];
@@ -864,10 +864,10 @@ function DriverBoardPanel({ loads, drivers, canEdit, companyId }) {
                 {canEdit ? (
                   <div>
                     <span className="text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>Message to driver</span>
-                    <DriverMessageThread driver={d} companyId={companyId} />
+                    <DriverMessageThread driver={d} companyId={companyId} currentUser={currentUser} />
                   </div>
                 ) : (
-                  <DriverMessageThread driver={d} companyId={companyId} />
+                  <DriverMessageThread driver={d} companyId={companyId} currentUser={currentUser} />
                 )}
               </div>
             </div>

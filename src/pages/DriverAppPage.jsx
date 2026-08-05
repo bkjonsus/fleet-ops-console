@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LogOut, Truck, MessageCircle, X, ChevronRight, ChevronDown } from "lucide-react";
+import { LogOut, Truck, MessageCircle, X, ChevronRight, ChevronDown, Menu } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -41,6 +41,7 @@ function FloatingMessages({ children }) {
 export default function DriverAppPage({ previewAsName, isPreview, onExitPreview }) {
   const { profile, signOut, activeCompanyId } = useAuth();
   const myName = previewAsName || profile?.full_name;
+  const [menuOpen, setMenuOpen] = useState(false);
   const { rows: allLoads, update: updateLoad } = useTable("loads", "created_at", false, activeCompanyId);
   const { rows: allDrivers, update: updateDriver } = useTable("drivers", "name", true, activeCompanyId);
   const docs = useDocuments(activeCompanyId);
@@ -57,17 +58,31 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
           <button onClick={onExitPreview} className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Exit Preview</button>
         </div>
       )}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3 mb-4">
+        {!isPreview && (
+          <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
+            <Menu size={22} />
+          </button>
+        )}
         <div>
           <h1 className="text-lg font-black uppercase tracking-wide" style={{ color: COLORS.text }}>My Loads</h1>
           <p className="text-xs" style={{ color: COLORS.muted }}>Welcome, {myName}</p>
         </div>
-        {!isPreview && (
-          <button onClick={signOut} className="flex items-center gap-1 text-xs font-bold uppercase" style={{ color: COLORS.muted }}>
-            <LogOut size={13} /> Sign Out
-          </button>
-        )}
       </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>
+          <div className="h-full flex flex-col" style={{ width: 220, maxWidth: "80vw", background: COLORS.surface, borderRight: `1px solid ${COLORS.line}` }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+              <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Menu</span>
+              <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
+            </div>
+            <button onClick={signOut} className="text-left px-3 py-2.5 text-xs font-bold uppercase flex items-center gap-2" style={{ color: COLORS.text, borderBottom: `1px solid ${COLORS.line}` }}>
+              <LogOut size={14} /> Sign Out
+            </button>
+          </div>
+        </div>
+      )}
 
       {!myDriverRecord && (
         <div className="p-3 mb-4 rounded text-xs" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}`, color: COLORS.red }}>

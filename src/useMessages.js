@@ -3,7 +3,7 @@ import { useTable } from "./useTable";
 // Messages for one driver's thread, real-time-ish via the same polling/refetch
 // useTable already does. sender is "driver" or "dispatch".
 export function useDriverMessages(driverId, companyId) {
-  const { rows: messages, loading, error, insert, update, refresh } = useTable("driver_messages", "created_at", true, companyId);
+  const { rows: messages, loading, error, insert, update, remove, refresh } = useTable("driver_messages", "created_at", true, companyId);
 
   const myMessages = driverId ? messages.filter((m) => m.driver_id === driverId) : [];
 
@@ -17,5 +17,18 @@ export function useDriverMessages(driverId, companyId) {
     unread.forEach((m) => update(m.id, { read: true }));
   }
 
-  return { messages: myMessages, loading, error, sendMessage, markThreadRead, refresh };
+  function editMessage(id, newText) {
+    if (!newText.trim()) return;
+    return update(id, { message: newText.trim() });
+  }
+
+  function deleteMessage(id) {
+    return remove(id);
+  }
+
+  function deleteMessages(ids) {
+    ids.forEach((id) => remove(id));
+  }
+
+  return { messages: myMessages, loading, error, sendMessage, markThreadRead, editMessage, deleteMessage, deleteMessages, refresh };
 }

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X, MessageCircle } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -770,14 +770,37 @@ function ReadinessEditor({ driver, onSave, onCancel }) {
 
 // Real two-way thread with the driver — same component and data source the
 // Driver App uses, so both sides see and reply to the exact same conversation.
+// Compact by default: a small icon with an unread badge, expanding to the full
+// thread only when tapped, instead of always showing the whole conversation inline.
 function DriverMessageThread({ driver, companyId, currentUser }) {
-  const { messages, sendMessage } = useDriverMessages(driver.id, companyId);
+  const { messages, sendMessage, markThreadRead } = useDriverMessages(driver.id, companyId);
+  const [open, setOpen] = useState(false);
+  const unreadCount = messages.filter((m) => m.sender === "driver" && !m.read).length;
+
+  useEffect(() => {
+    if (open && unreadCount > 0) markThreadRead("driver");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, messages.length]);
+
   return (
-    <MessageThread
-      messages={messages}
-      onSend={(text) => sendMessage("dispatch", currentUser, text)}
-      mySender="dispatch"
-    />
+    <div>
+      <button onClick={() => setOpen(!open)} title="Messages" className="relative flex items-center gap-1 text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>
+        <MessageCircle size={14} />
+        Messages
+        {unreadCount > 0 && (
+          <span className="rounded-full" style={{ position: "absolute", top: -3, right: -10, width: 8, height: 8, background: COLORS.red }} />
+        )}
+      </button>
+      {open && (
+        <div className="mt-2">
+          <MessageThread
+            messages={messages}
+            onSend={(text) => sendMessage("dispatch", currentUser, text)}
+            mySender="dispatch"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon, Send } from "lucide-react";
+import React, { useState, useEffect, useRef} from "react";
+import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon, Send, Pencil, X} from "lucide-react";
 import { useDocuments } from "./useDocuments";
 
 export const COLORS = {
@@ -315,33 +315,128 @@ export function HasDocsBadge({ documents, category, linkedTo }) {
 
 // A real back-and-forth chat thread. mySender is "driver" or "dispatch" — whichever
 // side is rendering it — so bubbles align correctly and the reply gets tagged right.
-export function MessageThread({ messages, onSend, mySender, placeholder }) {
+function formatMsgTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+  const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${weekday} ${month} ${d.getDate()}, ${time}`;
+}
+
+// A real back-and-forth chat thread. mySender is "driver" or "dispatch" — whichever
+// side is rendering it — so bubbles align correctly and the reply gets tagged right.
+// Own messages can be edited inline (pencil icon). Long-press (or right-click on
+// desktop) any message to enter select mode for bulk delete.
+export function MessageThread({ messages, onSend, onEdit, onDeleteMany, mySender, placeholder }) {
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const pressTimer = useRef(null);
+
   function send() {
     if (!text.trim()) return;
     onSend(text);
     setText("");
   }
+  function startEdit(m) {
+    setEditingId(m.id);
+    setEditText(m.message);
+  }
+  function saveEdit() {
+    if (editText.trim() && onEdit) onEdit(editingId, editText.trim());
+    setEditingId(null);
+  }
+  function enterSelectMode(id) {
+    setSelectMode(true);
+    setSelectedIds([id]);
+  }
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds([]);
+  }
+  function confirmBulkDelete() {
+    if (onDeleteMany && selectedIds.length) onDeleteMany(selectedIds);
+    exitSelectMode();
+  }
+  function handlePressStart(id) {
+    pressTimer.current = setTimeout(() => enterSelectMode(id), 500);
+  }
+  function handlePressEnd() {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  }
+
   return (
     <div>
-      <div style={{ maxHeight: 220, overflowY: "auto" }} className="flex flex-col gap-1.5 mb-2">
+      {selectMode && (
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-[11px] font-bold" style={{ color: COLORS.amber }}>{selectedIds.length} selected</span>
+          <div className="flex items-center gap-3">
+            <button onClick={confirmBulkDelete} title="Delete selected" style={{ color: COLORS.red }}><Trash2 size={14} /></button>
+            <button onClick={exitSelectMode} className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div style={{ maxHeight: 260, overflowY: "auto" }} className="flex flex-col gap-2 mb-2">
         {(!messages || messages.length === 0) && (
           <div className="text-[11px]" style={{ color: COLORS.muted }}>No messages yet.</div>
         )}
-        {(messages || []).map((m) => (
-          <div key={m.id} className="flex" style={{ justifyContent: m.sender === mySender ? "flex-end" : "flex-start" }}>
-            <div
-              className="px-2.5 py-1.5 rounded text-[11px]"
-              style={{
-                maxWidth: "80%",
-                background: m.sender === mySender ? COLORS.amber : COLORS.surfaceAlt,
-                color: m.sender === mySender ? COLORS.bg : COLORS.text,
-              }}
-            >
-              {m.message}
+        {(messages || []).map((m) => {
+          const isMine = m.sender === mySender;
+          const isSelected = selectedIds.includes(m.id);
+          return (
+            <div key={m.id} className="flex flex-col" style={{ alignItems: isMine ? "flex-end" : "flex-start" }}>
+              <div className="flex items-center gap-1.5" onContextMenu={(e) => { e.preventDefault(); enterSelectMode(m.id); }}>
+                {isSelected && <input type="checkbox" checked readOnly />}
+                {isMine && !selectMode && editingId !== m.id && (
+                  <button onClick={() => startEdit(m)} title="Edit" style={{ color: COLORS.muted }}><Pencil size={11} /></button>
+                )}
+                <div
+                  onMouseDown={() => handlePressStart(m.id)}
+                  onMouseUp={handlePressEnd}
+                  onMouseLeave={handlePressEnd}
+                  onTouchStart={() => handlePressStart(m.id)}
+                  onTouchEnd={handlePressEnd}
+                  onClick={() => { if (selectMode) toggleSelect(m.id); }}
+                  className="px-2.5 py-1.5 rounded text-[11px]"
+                  style={{
+                    maxWidth: 220,
+                    background: isMine ? COLORS.amber : COLORS.surfaceAlt,
+                    color: isMine ? COLORS.bg : COLORS.text,
+                    cursor: selectMode ? "pointer" : "default",
+                    outline: isSelected ? `2px solid ${COLORS.red}` : "none",
+                  }}
+                >
+                  {editingId === m.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditingId(null); }}
+                        style={{ background: "transparent", border: "none", outline: "none", color: "inherit", fontSize: 11, width: 140 }}
+                      />
+                      <button onClick={saveEdit} style={{ color: "inherit" }}><Check size={12} /></button>
+                    </div>
+                  ) : (
+                    m.message
+                  )}
+                </div>
+              </div>
+              <div className="text-[9px] mt-0.5 flex items-center gap-1" style={{ color: COLORS.muted }}>
+                <span>{m.sender_name || m.sender}</span>
+                <span> · </span>
+                <span>{formatMsgTime(m.created_at)}</span>
+                {isMine && <span>{m.read ? "✓✓" : "✓"}</span>}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex gap-2">
         <input
@@ -354,6 +449,25 @@ export function MessageThread({ messages, onSend, mySender, placeholder }) {
         <button onClick={send} title="Send" className="flex items-center justify-center rounded" style={{ width: 36, background: COLORS.amber, color: COLORS.bg }}>
           <Send size={14} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal popup chrome for a message thread — centered overlay with a header and
+// close button, matching the approved preview design. Wrap MessageThread in this
+// wherever messaging should appear as a popup rather than an inline card.
+export function MessageModal({ onClose, children }) {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)", zIndex: 200 }} onClick={onClose}>
+      <div className="rounded flex flex-col" style={{ width: 360, maxWidth: "100%", maxHeight: "80vh", background: COLORS.surface, border: `1px solid ${COLORS.amber}` }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-3" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
+          <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Messages</span>
+          <button onClick={onClose} style={{ color: COLORS.muted }}><X size={16} /></button>
+        </div>
+        <div className="p-3 overflow-y-auto">
+          {children}
+        </div>
       </div>
     </div>
   );

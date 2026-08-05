@@ -7,7 +7,7 @@ import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Pill, EmptyState, money, getStops, shortLocation,
   formatDateTimeCompact, StopCircle, DRIVER_BOARD_STATUSES, driverBoardStatusColor,
-  DocumentsSection, MessageThread,
+  DocumentsSection, MessageThread, MessageModal,
 } from "../ui";
 
 const DRIVER_UPDATABLE_STATUSES = ["En Route", "At Pickup", "In Transit", "Delivered"];
@@ -116,7 +116,7 @@ function AvailabilityCard({ driver, updateDriver, companyId, myName }) {
   const status = driver.board_status || "Ready";
   const [expanded, setExpanded] = useState(false);
   const [showMessages, setShowMessages] = useState(false);
-  const { messages, sendMessage, markThreadRead } = useDriverMessages(driver.id, companyId);
+  const { messages, sendMessage, markThreadRead, editMessage, deleteMessages } = useDriverMessages(driver.id, companyId);
   const unreadCount = messages.filter((m) => m.sender === "dispatch" && !m.read).length;
 
   useEffect(() => {
@@ -144,14 +144,16 @@ function AvailabilityCard({ driver, updateDriver, companyId, myName }) {
       </div>
 
       {showMessages && (
-        <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+        <MessageModal onClose={() => setShowMessages(false)}>
           <MessageThread
             messages={messages}
             onSend={(text) => sendMessage("driver", myName, text)}
+            onEdit={editMessage}
+            onDeleteMany={deleteMessages}
             mySender="driver"
             placeholder="Message dispatch\u2026"
           />
-        </div>
+        </MessageModal>
       )}
 
       {expanded && (

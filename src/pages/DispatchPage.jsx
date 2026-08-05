@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X, MessageCircle } from "lucide-react";
+import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X, MessageCircle, AlertTriangle, Flag } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -83,6 +83,8 @@ export default function DispatchPage({ canEdit, role }) {
   const currentUserLabel = profile?.full_name || profile?.role || "Unknown";
 
   const [dispatchView, setDispatchView] = useState("driver board");
+  const [flagBellOpen, setFlagBellOpen] = useState(false);
+  const flaggedLoads = loads.filter((l) => l.flagged);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(blankLoad());
@@ -184,6 +186,40 @@ export default function DispatchPage({ canEdit, role }) {
         <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
           <Menu size={22} />
         </button>
+        <div className="relative">
+          <button onClick={() => setFlagBellOpen(!flagBellOpen)} title="Flagged loads" className="relative" style={{ color: flaggedLoads.length > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
+            <AlertTriangle size={20} />
+            {flaggedLoads.length > 0 && (
+              <span className="flex items-center justify-center rounded-full" style={{ position: "absolute", top: -6, right: -8, minWidth: 16, height: 16, padding: "0 4px", fontSize: 9, fontWeight: 700, background: COLORS.red, color: "#fff" }}>
+                {flaggedLoads.length}
+              </span>
+            )}
+          </button>
+          {flagBellOpen && (
+            <>
+              <div className="fixed inset-0" style={{ zIndex: 95 }} onClick={() => setFlagBellOpen(false)} />
+              <div className="absolute right-0 mt-2 rounded overflow-hidden" style={{ width: 280, maxWidth: "85vw", maxHeight: 340, overflowY: "auto", background: COLORS.surface, border: `1px solid ${COLORS.red}`, zIndex: 96, boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                <div className="px-3 py-2 text-[11px] font-bold uppercase" style={{ color: COLORS.red, borderBottom: `1px solid ${COLORS.line}` }}>
+                  Flagged Loads ({flaggedLoads.length})
+                </div>
+                {flaggedLoads.length === 0 && (
+                  <div className="px-3 py-4 text-xs text-center" style={{ color: COLORS.muted }}>No flagged loads right now.</div>
+                )}
+                {flaggedLoads.map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => { setDispatchView(IN_TRANSIT_STATUSES.includes(l.status) ? "in transit" : HISTORY_STATUSES.includes(l.status) ? "history" : "upcoming"); setFlagBellOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs flex flex-col gap-0.5"
+                    style={{ borderBottom: `1px solid ${COLORS.line}`, color: COLORS.text }}
+                  >
+                    <span className="font-mono font-bold" style={{ color: COLORS.amber }}>{l.load_number}</span>
+                    {l.flag_reason && <span style={{ color: COLORS.muted }}>{l.flag_reason}</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Dispatch</div>
           <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{dispatchView}</div>
@@ -594,6 +630,19 @@ function LoadRow({ load: l, drivers, trucks, invoices, isHistory, role, update, 
 
               {l.status === "TONU" && <TonuPanel load={l} update={update} canEdit={canEdit} />}
 
+              {l.flagged ? (
+                <div className="mt-0.5 px-2 py-1 rounded flex items-center justify-between gap-2" style={{ background: "#3A1E20", border: `1px solid ${COLORS.red}` }}>
+                  <span className="text-[11px]" style={{ color: COLORS.red }}>
+                    <span className="font-bold uppercase">Flagged</span>{l.flag_reason ? ` — ${l.flag_reason}` : ""}
+                  </span>
+                  {canEdit && (
+                    <button onClick={() => update(l.id, { flagged: false, flag_reason: null })} className="text-[10px] font-bold uppercase" style={{ color: COLORS.muted }}>Clear</button>
+                  )}
+                </div>
+              ) : (
+                canEdit && <FlagToggle load={l} update={update} />
+              )}
+
               {canEditInfo && (
                 <div className="flex gap-3">
                   <button onClick={startEdit} className="text-[10px] font-bold uppercase self-start hover:opacity-70" style={{ color: COLORS.amber }}>Edit Load</button>
@@ -802,6 +851,33 @@ function DriverMessageThread({ driver, companyId, currentUser }) {
           />
         </MessageModal>
       )}
+    </div>
+  );
+}
+
+function FlagToggle({ load, update }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="flex items-center gap-1 text-[10px] font-bold uppercase self-start hover:opacity-70" style={{ color: COLORS.red }}>
+        <Flag size={11} /> Flag this load
+      </button>
+    );
+  }
+  return (
+    <div className="p-2 rounded flex flex-col gap-1.5" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}` }}>
+      <input
+        autoFocus
+        style={{ ...inputStyle, fontSize: 11, padding: "5px 8px" }}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Reason (optional)"
+      />
+      <div className="flex gap-2">
+        <button onClick={() => { update(load.id, { flagged: true, flag_reason: reason || null }); setOpen(false); setReason(""); }} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ background: COLORS.red, color: "#2A0C0C" }}>Flag</button>
+        <button onClick={() => setOpen(false)} className="px-2 py-1 text-[10px] font-bold uppercase rounded" style={{ color: COLORS.muted }}>Cancel</button>
+      </div>
     </div>
   );
 }

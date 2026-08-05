@@ -182,10 +182,16 @@ export default function DispatchPage({ canEdit, role }) {
     <div>
       <ErrorBanner message={error} />
 
-      <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
         <button onClick={() => setMenuOpen(true)} title="Menu" style={{ color: COLORS.amber, flexShrink: 0 }}>
           <Menu size={22} />
         </button>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Dispatch</div>
+          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{dispatchView}</div>
+        </div>
+          </div>
         <div className="relative">
           <button onClick={() => setFlagBellOpen(!flagBellOpen)} title="Flagged loads" className="relative" style={{ color: flaggedLoads.length > 0 ? COLORS.red : COLORS.muted, flexShrink: 0 }}>
             <AlertTriangle size={20} />
@@ -220,11 +226,7 @@ export default function DispatchPage({ canEdit, role }) {
             </>
           )}
         </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wide" style={{ color: COLORS.muted }}>Dispatch</div>
-          <div className="text-sm font-bold capitalize" style={{ color: COLORS.text }}>{dispatchView}</div>
         </div>
-      </div>
 
       {menuOpen && (
         <div className="fixed inset-0 flex" style={{ background: "rgba(0,0,0,0.6)", zIndex: 100 }} onClick={() => setMenuOpen(false)}>

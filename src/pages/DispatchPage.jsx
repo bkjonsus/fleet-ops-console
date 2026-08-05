@@ -3,13 +3,14 @@ import * as XLSX from "xlsx";
 import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, Trash2, Filter as FilterIcon, Menu, X } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
+import { useDriverMessages } from "../useMessages";
 import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime,
   todayISO, sanitizeForInsert, TONU_STATUSES, tonuStatusColor, getStops, shortLocation,
   formatDateTimeCompact, ratePerMile, generateCode, useIsMobile, StopCircle,
   DRIVER_BOARD_STATUSES, driverBoardStatusColor, uid, canEditLoadInfo, IN_TRANSIT_STATUSES, HISTORY_STATUSES,
-  DocumentsSection, HasDocsBadge,
+  DocumentsSection, HasDocsBadge, MessageThread,
 } from "../ui";
 
 const LOAD_STATUSES = ["Assigned", "En Route", "At Pickup", "In Transit", "Delivered", "Delayed", "Canceled", "TONU"];
@@ -262,7 +263,7 @@ export default function DispatchPage({ canEdit, role }) {
       )}
 
       {dispatchView === "driver board" ? (
-        <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} />
+        <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} companyId={activeCompanyId} />
       ) : (
         <>
           <div className="flex items-center justify-between mb-2 gap-2">
@@ -767,6 +768,19 @@ function ReadinessEditor({ driver, onSave, onCancel }) {
   );
 }
 
+// Real two-way thread with the driver — same component and data source the
+// Driver App uses, so both sides see and reply to the exact same conversation.
+function DriverMessageThread({ driver, companyId }) {
+  const { messages, sendMessage } = useDriverMessages(companyId, driver.name);
+  return (
+    <MessageThread
+      messages={messages}
+      onSend={(text) => sendMessage(text, "dispatch")}
+      mySender="dispatch"
+    />
+  );
+}
+
 function DispatchNoteField({ driver, updateDriver }) {
   const [value, setValue] = useState(driver.dispatch_note || "");
   return (
@@ -780,7 +794,7 @@ function DispatchNoteField({ driver, updateDriver }) {
   );
 }
 
-function DriverBoardPanel({ loads, drivers, canEdit }) {
+function DriverBoardPanel({ loads, drivers, canEdit, companyId }) {
   const { update: updateDriver } = useTable("drivers", "name", true);
   const [editingReady, setEditingReady] = useState(null);
   const activeStatuses = ["Assigned", "En Route", "At Pickup", "In Transit"];
@@ -850,14 +864,10 @@ function DriverBoardPanel({ loads, drivers, canEdit }) {
                 {canEdit ? (
                   <div>
                     <span className="text-[10px] font-bold uppercase" style={{ color: COLORS.amber }}>Message to driver</span>
-                    <DispatchNoteField driver={d} updateDriver={updateDriver} />
+                    <DriverMessageThread driver={d} companyId={companyId} />
                   </div>
                 ) : (
-                  d.dispatch_note && (
-                    <div className="text-[11px]" style={{ color: COLORS.muted }}>
-                      <span className="font-bold" style={{ color: COLORS.amber }}>Dispatch: </span>{d.dispatch_note}
-                    </div>
-                  )
+                  <DriverMessageThread driver={d} companyId={companyId} />
                 )}
               </div>
             </div>

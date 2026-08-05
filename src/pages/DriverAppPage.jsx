@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LogOut, Truck, MessageCircle, X } from "lucide-react";
+import { LogOut, Truck, MessageCircle, X, ChevronRight, ChevronDown } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -76,10 +76,9 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
         </div>
       )}
 
-      {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} />}
+      {myDriverRecord && <AvailabilityCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} myName={myName} />}
       {myDriverRecord && !isPreview && <LiveLocationCard driver={myDriverRecord} updateDriver={updateDriver} companyId={activeCompanyId} />}
       {myDriverRecord && <MyDocumentsCard driver={myDriverRecord} docs={docs} currentUser={myName} />}
-      {myDriverRecord && <MessagesCard driver={myDriverRecord} companyId={activeCompanyId} myName={myName} />}
 
       <h2 className="text-sm font-bold uppercase tracking-wide mt-5 mb-2" style={{ color: COLORS.text }}>
         Active Loads <span style={{ color: COLORS.muted }}>({activeLoads.length})</span>
@@ -105,46 +104,90 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
   );
 }
 
-function AvailabilityCard({ driver, updateDriver }) {
+// Compact by default: one row with status, a short summary, and the message icon
+// (with an unread dot) all inline — tap the row to expand the full editable form,
+// tap the message icon separately to open the conversation. Matches the original
+// preview design instead of a separate always-open form + a floating chat bubble.
+function AvailabilityCard({ driver, updateDriver, companyId, myName }) {
   const [note, setNote] = useState(driver.board_note || "");
   const [readyDate, setReadyDate] = useState(driver.ready_date || "");
   const [readyTime, setReadyTime] = useState(driver.ready_time || "");
   const [readyCity, setReadyCity] = useState(driver.ready_city || "");
   const status = driver.board_status || "Ready";
+  const [expanded, setExpanded] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
+  const { messages, sendMessage, markThreadRead } = useDriverMessages(driver.id, companyId);
+  const unreadCount = messages.filter((m) => m.sender === "dispatch" && !m.read).length;
+
+  useEffect(() => {
+    if (showMessages && unreadCount > 0) markThreadRead("dispatch");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMessages, messages.length]);
 
   return (
-    <div className="p-3 rounded flex flex-col gap-3" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
-      <div className="text-xs font-bold uppercase tracking-wide" style={{ color: COLORS.amber }}>My Availability</div>
-      <Field label="Status">
-        <select
-          value={status}
-          onChange={(e) => updateDriver(driver.id, { board_status: e.target.value })}
-          style={{ ...inputStyle, color: driverBoardStatusColor(status), borderColor: driverBoardStatusColor(status) }}
-        >
-          {DRIVER_BOARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </Field>
-      <div className="flex gap-2 flex-wrap">
-        <Field label="Ready Date">
-          <input style={{ ...inputStyle, width: 140 }} type="date" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_date: readyDate })} />
-        </Field>
-        <Field label="Ready Time">
-          <input style={{ ...inputStyle, width: 120 }} type="time" value={readyTime} onChange={(e) => setReadyTime(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_time: readyTime })} />
-        </Field>
+    <div className="p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+      <div className="flex items-center justify-between gap-2">
+        <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-2 flex-1 text-left" style={{ minWidth: 0 }}>
+          {expanded ? <ChevronDown size={14} style={{ color: COLORS.muted, flexShrink: 0 }} /> : <ChevronRight size={14} style={{ color: COLORS.muted, flexShrink: 0 }} />}
+          <Pill color={driverBoardStatusColor(status)}>{status}</Pill>
+          <span className="text-xs truncate" style={{ color: COLORS.text }}>
+            {readyDate ? formatDateTimeCompact(readyDate, readyTime) : "Not set"}
+            {readyCity ? ` \u00b7 ${readyCity}` : ""}
+          </span>
+        </button>
+        <button onClick={() => setShowMessages(!showMessages)} title="Messages" className="relative flex-shrink-0" style={{ color: COLORS.amber }}>
+          <MessageCircle size={18} />
+          {unreadCount > 0 && (
+            <span className="rounded-full" style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, background: COLORS.red }} />
+          )}
+        </button>
       </div>
-      <Field label="Ready City">
-        <input style={inputStyle} value={readyCity} onChange={(e) => setReadyCity(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_city: readyCity })} placeholder="Dallas, TX" />
-      </Field>
-      <Field label="My Comments (preferred lanes, home time, plans, etc.)">
-        <textarea
-          style={{ ...inputStyle, width: "100%" }}
-          rows={2}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => updateDriver(driver.id, { board_note: note })}
-          placeholder="e.g. Want to head toward FL next, home by Sunday…"
-        />
-      </Field>
+
+      {showMessages && (
+        <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+          <MessageThread
+            messages={messages}
+            onSend={(text) => sendMessage("driver", myName, text)}
+            mySender="driver"
+            placeholder="Message dispatch\u2026"
+          />
+        </div>
+      )}
+
+      {expanded && (
+        <div className="mt-3 pt-3 flex flex-col gap-3" style={{ borderTop: `1px solid ${COLORS.line}` }}>
+          <Field label="Status">
+            <select
+              value={status}
+              onChange={(e) => updateDriver(driver.id, { board_status: e.target.value })}
+              style={{ ...inputStyle, color: driverBoardStatusColor(status), borderColor: driverBoardStatusColor(status) }}
+            >
+              {DRIVER_BOARD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <div className="flex gap-2 flex-wrap">
+            <Field label="Ready Date">
+              <input style={{ ...inputStyle, width: 140 }} type="date" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_date: readyDate })} />
+            </Field>
+            <Field label="Ready Time">
+              <input style={{ ...inputStyle, width: 120 }} type="time" value={readyTime} onChange={(e) => setReadyTime(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_time: readyTime })} />
+            </Field>
+          </div>
+          <Field label="Ready City">
+            <input style={inputStyle} value={readyCity} onChange={(e) => setReadyCity(e.target.value)} onBlur={() => updateDriver(driver.id, { ready_city: readyCity })} placeholder="Dallas, TX" />
+          </Field>
+          <Field label="My Comments (preferred lanes, home time, plans, etc.)">
+            <textarea
+              style={{ ...inputStyle, width: "100%" }}
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onBlur={() => updateDriver(driver.id, { board_note: note })}
+              placeholder="e.g. Want to head toward FL next, home by Sunday\u2026"
+            />
+          </Field>
+        </div>
+      )}
     </div>
   );
 }

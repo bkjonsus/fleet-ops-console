@@ -382,11 +382,11 @@ export function MessageThread({ messages, onSend, onEdit, onDeleteMany, mySender
           </div>
         </div>
       )}
-      <div style={{ maxHeight: 260, overflowY: "auto" }} className="flex flex-col gap-2 mb-2">
+      <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column-reverse" }} className="gap-2 mb-2">
         {(!messages || messages.length === 0) && (
           <div className="text-[11px]" style={{ color: COLORS.muted }}>No messages yet.</div>
         )}
-        {(messages || []).map((m) => {
+        {[...(messages || [])].reverse().map((m) => {
           const isMine = m.sender === mySender;
           const isSelected = selectedIds.includes(m.id);
           return (

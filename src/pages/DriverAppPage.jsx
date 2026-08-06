@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LogOut, Truck, MessageCircle, X, ChevronRight, ChevronDown, Menu } from "lucide-react";
+import { LogOut, Truck, MessageCircle, X, ChevronRight, ChevronDown, Menu, Sun, Moon, Monitor } from "lucide-react";
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
@@ -42,6 +42,39 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
   const { profile, signOut, activeCompanyId } = useAuth();
   const myName = previewAsName || profile?.full_name;
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Three-way theme cycle: dark -> light -> auto (follows the phone's system
+  // setting) -> back to dark. Only this page is themeable for now -- everywhere
+  // else keeps its current dark styling untouched (see ui.jsx COLORS comment).
+  const [themeMode, setThemeMode] = useState(() => {
+    try { return localStorage.getItem("driverTheme") || "dark"; } catch { return "dark"; }
+  });
+  const [systemPrefersLight, setSystemPrefersLight] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const handler = (e) => setSystemPrefersLight(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  const isLight = themeMode === "light" || (themeMode === "auto" && systemPrefersLight);
+  function cycleTheme() {
+    const next = themeMode === "dark" ? "light" : themeMode === "light" ? "auto" : "dark";
+    setThemeMode(next);
+    try { localStorage.setItem("driverTheme", next); } catch {}
+  }
+  const LIGHT_VARS = {
+    "--tms-bg": "#F5F7FA",
+    "--tms-surface": "#FFFFFF",
+    "--tms-surface-alt": "#F0F2F5",
+    "--tms-line": "#D8DEE6",
+    "--tms-amber": "#B8860B",
+    "--tms-green": "#1F8F4E",
+    "--tms-red": "#C0392B",
+    "--tms-text": "#1A1F26",
+    "--tms-muted": "#5A6472",
+  };
   const { rows: allLoads, update: updateLoad } = useTable("loads", "created_at", false, activeCompanyId);
   const { rows: allDrivers, update: updateDriver } = useTable("drivers", "name", true, activeCompanyId);
   const docs = useDocuments(activeCompanyId);
@@ -51,7 +84,7 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
   const myDriverRecord = allDrivers.find((d) => d.name === myName);
 
   return (
-    <div>
+    <div style={isLight ? LIGHT_VARS : undefined}>
       {isPreview && (
         <div className="mb-3 px-3 py-2 rounded flex items-center justify-between flex-wrap gap-2" style={{ background: "#2A2110", border: `1px solid ${COLORS.amber}` }}>
           <span className="text-xs font-bold" style={{ color: COLORS.amber }}>Previewing as: {myName}</span>
@@ -77,6 +110,10 @@ export default function DriverAppPage({ previewAsName, isPreview, onExitPreview 
               <span className="text-xs font-bold uppercase" style={{ color: COLORS.amber }}>Menu</span>
               <button onClick={() => setMenuOpen(false)} style={{ color: COLORS.muted }}><X size={16} /></button>
             </div>
+            <button onClick={cycleTheme} className="text-left px-3 py-2.5 text-xs font-bold uppercase flex items-center gap-2" style={{ color: COLORS.text, borderBottom: `1px solid ${COLORS.line}` }}>
+              {themeMode === "dark" ? <Moon size={14} /> : themeMode === "light" ? <Sun size={14} /> : <Monitor size={14} />}
+              {themeMode === "dark" ? "Dark" : themeMode === "light" ? "Light" : "Auto"}
+            </button>
             <button onClick={signOut} className="text-left px-3 py-2.5 text-xs font-bold uppercase flex items-center gap-2" style={{ color: COLORS.text, borderBottom: `1px solid ${COLORS.line}` }}>
               <LogOut size={14} /> Sign Out
             </button>

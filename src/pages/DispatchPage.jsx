@@ -4,6 +4,7 @@ import { Plus, ChevronRight, ChevronDown, Pencil, Download, Printer, ArrowLeft, 
 import { useTable } from "../useTable";
 import { useDocuments } from "../useDocuments";
 import { useDriverMessages } from "../useMessages";
+import { LiveMapPanel } from "./FleetPage";
 import { useAuth } from "../AuthContext";
 import {
   COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, formatTime,
@@ -99,6 +100,7 @@ export default function DispatchPage({ canEdit, role }) {
 
   const MENU_ITEMS = [
     { key: "driver board", label: "Driver Board" },
+    { key: "live map", label: "Live Map" },
     { key: "trips", label: "Trips" },
   ];
 
@@ -300,7 +302,9 @@ export default function DispatchPage({ canEdit, role }) {
         </div>
       )}
 
-      {dispatchView === "driver board" ? (
+      {dispatchView === "live map" ? (
+        <LiveMapPanel companyId={activeCompanyId} />
+      ) : dispatchView === "driver board" ? (
         <DriverBoardPanel loads={loads} drivers={drivers} canEdit={canEdit} companyId={activeCompanyId} currentUser={currentUserLabel} />
       ) : (
         <>

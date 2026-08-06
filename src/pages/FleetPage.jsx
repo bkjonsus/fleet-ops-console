@@ -529,7 +529,7 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
 // Real Mapbox map, real driver GPS pins. Only shows drivers with a live_location_at
 // fix inside the last 10 minutes. Requires VITE_MAPBOX_TOKEN to be set as an env var
 // (Vercel + local .env) or this shows a setup message instead of crashing.
-function LiveMapPanel({ companyId }) {
+export function LiveMapPanel({ companyId }) {
   const { rows: drivers } = useTable("drivers", "name", true, companyId);
   const [selectedId, setSelectedId] = useState(null);
   const mapContainerRef = useRef(null);

@@ -594,6 +594,17 @@ export function LiveMapPanel({ companyId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pins.map((p) => `${p.id}:${p.live_lat}:${p.live_lng}:${p.live_speed_mph}`).join(",")]);
 
+  // Pan/zoom the map to whichever driver is currently selected -- clicking a
+  // name in the "Sharing Now" list should visually take you to their pin, not
+  // just show the info card above the map.
+  useEffect(() => {
+    if (!mapRef.current || !selectedId) return;
+    const selected = pins.find((p) => p.id === selectedId);
+    if (!selected) return;
+    mapRef.current.flyTo({ center: [selected.live_lng, selected.live_lat], zoom: 10, duration: 800 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="p-4 rounded text-xs" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}`, color: COLORS.red }}>

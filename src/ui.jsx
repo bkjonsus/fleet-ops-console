@@ -2,16 +2,20 @@ import React, { useState, useEffect, useRef} from "react";
 import { Paperclip, Eye, Trash2, MoreVertical, Check, X as XIcon, Send, Pencil, X} from "lucide-react";
 import { useDocuments } from "./useDocuments";
 
+// Values are CSS variables with the current dark-theme hex as the fallback --
+// every existing page keeps rendering exactly as before, since nothing defines
+// these variables anywhere yet. Only a page that explicitly sets them (e.g. a
+// light-mode wrapper) will see a different result; everything else is unaffected.
 export const COLORS = {
-  bg: "#0B1119",
-  surface: "#161F2C",
-  surfaceAlt: "#1C2735",
-  line: "#2A3646",
-  amber: "#FFB627",
-  green: "#2FBF71",
-  red: "#E5484D",
-  text: "#EDF1F5",
-  muted: "#8DA0B3",
+  bg: "var(--tms-bg, #0B1119)",
+  surface: "var(--tms-surface, #161F2C)",
+  surfaceAlt: "var(--tms-surface-alt, #1C2735)",
+  line: "var(--tms-line, #2A3646)",
+  amber: "var(--tms-amber, #FFB627)",
+  green: "var(--tms-green, #2FBF71)",
+  red: "var(--tms-red, #E5484D)",
+  text: "var(--tms-text, #EDF1F5)",
+  muted: "var(--tms-muted, #8DA0B3)",
 };
 
 export const inputStyle = {

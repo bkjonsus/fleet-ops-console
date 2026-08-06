@@ -3,6 +3,7 @@ import { Plus, Trash2, Menu, X, AlertTriangle } from "lucide-react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useTable } from "../useTable";
+import { supabase } from "../supabaseClient";
 import { useDocuments } from "../useDocuments";
 import { useAuth } from "../AuthContext";
 import { COLORS, inputStyle, Field, Panel, Pill, EmptyState, ErrorBanner, money, formatDate, todayISO, daysUntil, returnColor, returnLabel, sanitizeForInsert, DocumentsSection, HasDocsBadge, docColor, docLabel } from "../ui";
@@ -532,6 +533,9 @@ function TrailersPanel({ canEdit, docs, currentUser, companyId }) {
 export function LiveMapPanel({ companyId }) {
   const { rows: drivers } = useTable("drivers", "name", true, companyId);
   const [selectedId, setSelectedId] = useState(null);
+  const [historyDriverId, setHistoryDriverId] = useState("");
+  const [historyPoints, setHistoryPoints] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -605,6 +609,58 @@ export function LiveMapPanel({ companyId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // Last 24 hours of logged positions for the selected driver, drawn as a
+  // route line -- reuses the same driver_speed_logs data already being
+  // recorded every ~60s while a driver shares their location.
+  async function loadHistory(driverId) {
+    setHistoryDriverId(driverId);
+    if (!driverId) {
+      setHistoryPoints([]);
+      return;
+    }
+    setHistoryLoading(true);
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("driver_speed_logs")
+      .select("lat, lng, speed_mph, recorded_at")
+      .eq("driver_id", driverId)
+      .gte("recorded_at", since)
+      .order("recorded_at", { ascending: true });
+    setHistoryLoading(false);
+    if (!error && data) setHistoryPoints(data.filter((p) => p.lat && p.lng));
+  }
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const sourceId = "driver-history-route";
+
+    function drawRoute() {
+      if (historyPoints.length < 2) {
+        if (map.getLayer(sourceId)) map.removeLayer(sourceId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+        return;
+      }
+      const geojson = {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: historyPoints.map((p) => [p.lng, p.lat]) },
+      };
+      if (map.getSource(sourceId)) {
+        map.getSource(sourceId).setData(geojson);
+      } else {
+        map.addSource(sourceId, { type: "geojson", data: geojson });
+        map.addLayer({ id: sourceId, type: "line", source: sourceId, paint: { "line-color": COLORS.amber, "line-width": 3, "line-opacity": 0.8 } });
+      }
+      const lngs = historyPoints.map((p) => p.lng);
+      const lats = historyPoints.map((p) => p.lat);
+      map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 40, duration: 800 });
+    }
+
+    if (map.isStyleLoaded()) drawRoute();
+    else map.once("load", drawRoute);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyPoints]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="p-4 rounded text-xs" style={{ background: COLORS.surfaceAlt, border: `1px solid ${COLORS.red}`, color: COLORS.red }}>
@@ -669,6 +725,30 @@ export function LiveMapPanel({ companyId }) {
             </div>
           </button>
         ))}
+      </div>
+
+      <div className="mt-3 p-3 rounded" style={{ background: COLORS.surface, border: `1px solid ${COLORS.line}` }}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-bold uppercase" style={{ color: COLORS.muted }}>Driving History (last 24h)</span>
+          {historyDriverId && (
+            <button onClick={() => loadHistory("")} className="text-[10px] font-bold uppercase" style={{ color: COLORS.muted }}>Clear</button>
+          )}
+        </div>
+        <select
+          value={historyDriverId}
+          onChange={(e) => loadHistory(e.target.value)}
+          style={{ ...inputStyle, fontSize: 12, padding: "6px 8px", width: "100%" }}
+        >
+          <option value="">Select a driver...</option>
+          {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        {historyLoading && <div className="text-[11px] mt-2" style={{ color: COLORS.muted }}>Loading route...</div>}
+        {historyDriverId && !historyLoading && historyPoints.length < 2 && (
+          <div className="text-[11px] mt-2" style={{ color: COLORS.muted }}>No location history in the last 24 hours.</div>
+        )}
+        {historyPoints.length >= 2 && (
+          <div className="text-[11px] mt-2" style={{ color: COLORS.amber }}>{historyPoints.length} points logged, shown as the amber line on the map.</div>
+        )}
       </div>
     </div>
   );
